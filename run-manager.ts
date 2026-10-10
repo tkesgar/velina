@@ -79,6 +79,10 @@ function isFinished(status: RunStatus) {
   return status === "succeeded" || status === "failed" || status === "stopped";
 }
 
+function isActive(status: RunStatus) {
+  return status === "starting" || status === "running" || status === "stopping";
+}
+
 function resolveEnvironment(
   parent: NodeJS.ProcessEnv,
   shared: Record<string, string | null>,
@@ -138,6 +142,17 @@ export class RunManager {
     }
     if (!Object.hasOwn(app.scripts, scriptName)) {
       throw new Error("The selected script is not configured for this app");
+    }
+    const existingRun = [...this.runs.values()].find(
+      (run) =>
+        run.appIndex === appIndex &&
+        run.scriptName === scriptName &&
+        isActive(run.status),
+    );
+    if (existingRun) {
+      throw new Error(
+        `${app.name} / ${scriptName} is already running (run ${existingRun.id.slice(0, 8)})`,
+      );
     }
 
     const command = app.scripts[scriptName];

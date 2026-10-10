@@ -41,7 +41,9 @@ When `apps` is omitted from `.velina.yml`, Velina discovers app directories unde
 - `apps/frontend`: serves a page on port `3012` that calls the backend.
 
 Run scripts from the **Apps** tab. The **Runs** tab streams stdout and stderr,
-shows the effective environment, and lets you stop or remove runs. Environment
+shows the effective environment, and lets you stop or remove runs. Only one
+instance of an app's script can run at a time; finished runs can be restarted.
+Inherited `process.env` values can be toggled in the environment view. Environment
 values are merged in this order: Velina's `process.env`, top-level `env`, then
 app-level `env`; a `null` value removes an inherited variable.
 

@@ -16,6 +16,7 @@ import {
   Skeleton,
   Space,
   Statistic,
+  Switch,
   Table,
   Tabs,
   Tag,
@@ -29,6 +30,7 @@ import {
   Outlet,
   Route,
   Routes,
+  useLocation,
   useNavigate,
 } from "react-router";
 import { newWebSocketRpcSession } from "capnweb";
@@ -72,19 +74,21 @@ function DashboardLayout() {
 
 function AppsPage() {
   const { data, error, isLoading } = useSWR("config", () => api.getConfig());
+  const { data: runs = [] } = useSWR<RunSummary[]>("runs", () => api.getRuns(), {
+    refreshInterval: 1000,
+  });
+  const navigate = useNavigate();
   const [startingScripts, setStartingScripts] = useState<Set<string>>(new Set());
   const [runError, setRunError] = useState<string | null>(null);
-  const [startedRun, setStartedRun] = useState<string | null>(null);
 
-  async function startScript(appIndex: number, appName: string, scriptName: string) {
+  async function startScript(appIndex: number, scriptName: string) {
     const key = `${appIndex}:${scriptName}`;
     setStartingScripts((current) => new Set(current).add(key));
     setRunError(null);
-    setStartedRun(null);
 
     try {
       const run = await api.startRun(appIndex, scriptName);
-      setStartedRun(`${appName} · ${scriptName} · ${run.id.slice(0, 8)}`);
+      navigate("/runs", { state: { runId: run.id } });
     } catch (cause) {
       setRunError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -132,16 +136,6 @@ function AppsPage() {
           onClose={() => setRunError(null)}
         />
       )}
-      {startedRun && (
-        <Alert
-          type="success"
-          showIcon
-          closable
-          message="Run started"
-          description={startedRun}
-          onClose={() => setStartedRun(null)}
-        />
-      )}
 
       {apps.length === 0 ? (
         <Empty description="No apps were found in the Velina configuration." />
@@ -164,6 +158,12 @@ function AppsPage() {
                   <div className="script-list">
                     {Object.entries(app.scripts).map(([scriptName, command]) => {
                       const key = `${appIndex}:${scriptName}`;
+                      const activeRun = runs.find(
+                        (run) =>
+                          run.appIndex === appIndex &&
+                          run.scriptName === scriptName &&
+                          isRunActive(run.status),
+                      );
                       return (
                         <Card
                           key={scriptName}
@@ -171,15 +171,26 @@ function AppsPage() {
                           className="script-card"
                           title={<Typography.Text code>{scriptName}</Typography.Text>}
                           extra={
-                            <Button
-                              type="primary"
-                              loading={startingScripts.has(key)}
-                              onClick={() =>
-                                void startScript(appIndex, app.name, scriptName)
-                              }
-                            >
-                              Run
-                            </Button>
+                            activeRun ? (
+                              <Space>
+                                <Tag color={statusColor(activeRun.status)}>{activeRun.status}</Tag>
+                                <Button
+                                  onClick={() =>
+                                    navigate("/runs", { state: { runId: activeRun.id } })
+                                  }
+                                >
+                                  View run
+                                </Button>
+                              </Space>
+                            ) : (
+                              <Button
+                                type="primary"
+                                loading={startingScripts.has(key)}
+                                onClick={() => void startScript(appIndex, scriptName)}
+                              >
+                                Run
+                              </Button>
+                            )
                           }
                         >
                           <Typography.Text className="script-command" code>
@@ -197,6 +208,14 @@ function AppsPage() {
       )}
     </div>
   );
+}
+
+function isRunActive(status: RunStatus) {
+  return status === "starting" || status === "running" || status === "stopping";
+}
+
+function isRunFinished(status: RunStatus) {
+  return status === "succeeded" || status === "failed" || status === "stopped";
 }
 
 function statusColor(status: RunStatus) {
@@ -219,15 +238,20 @@ function RunDetails({
   run,
   onStop,
   onClean,
+  onRestart,
+  hasActiveDuplicate,
   isBusy,
 }: {
   run: RunSummary;
   onStop: (runId: string) => void;
   onClean: (runId: string) => void;
+  onRestart: (run: RunSummary) => void;
+  hasActiveDuplicate: boolean;
   isBusy: boolean;
 }) {
   const [snapshot, setSnapshot] = useState<RunSnapshot | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
+  const [showSystemVariables, setShowSystemVariables] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -280,8 +304,12 @@ function RunDetails({
   }, [run.id]);
 
   const details = snapshot;
-  const finished = run.status === "succeeded" || run.status === "failed" || run.status === "stopped";
+  const runStatus = details?.status ?? run.status;
+  const finished = isRunFinished(runStatus);
   const environment = details?.environment ?? [];
+  const visibleEnvironment = environment.filter(
+    (entry) => showSystemVariables || entry.source !== "process.env",
+  );
 
   return (
     <Card
@@ -291,28 +319,35 @@ function RunDetails({
           <Typography.Text strong>{run.appName}</Typography.Text>
           <Typography.Text type="secondary">/</Typography.Text>
           <Typography.Text code>{run.scriptName}</Typography.Text>
-          <Tag color={statusColor(details?.status ?? run.status)}>
-            {details?.status ?? run.status}
-          </Tag>
+          <Tag color={statusColor(runStatus)}>{runStatus}</Tag>
         </Space>
       }
-      extra={finished ? (
-        <Popconfirm
-          title="Remove this run and its buffered output?"
-          onConfirm={() => onClean(run.id)}
-        >
-          <Button danger type="text" loading={isBusy}>Remove</Button>
-        </Popconfirm>
-      ) : (
-        <Button
-          danger
-          loading={isBusy || run.status === "stopping"}
-          disabled={run.status === "stopping"}
-          onClick={() => onStop(run.id)}
-        >
-          Stop
-        </Button>
-      )}
+      extra={
+        <Space>
+          {finished && !hasActiveDuplicate && (
+            <Button type="primary" loading={isBusy} onClick={() => onRestart(run)}>
+              Restart
+            </Button>
+          )}
+          {finished ? (
+            <Popconfirm
+              title="Remove this run and its buffered output?"
+              onConfirm={() => onClean(run.id)}
+            >
+              <Button danger type="text" loading={isBusy}>Remove</Button>
+            </Popconfirm>
+          ) : (
+            <Button
+              danger
+              loading={isBusy || runStatus === "stopping"}
+              disabled={runStatus === "stopping"}
+              onClick={() => onStop(run.id)}
+            >
+              Stop
+            </Button>
+          )}
+        </Space>
+      }
     >
       {details ? (
         <>
@@ -356,34 +391,46 @@ function RunDetails({
               },
               {
                 key: "environment",
-                label: `Environment (${environment.length})`,
+                label: `Environment (${visibleEnvironment.length}/${environment.length})`,
                 children: (
-                  <Table<RunEnvironmentEntry>
-                    size="small"
-                    rowKey="name"
-                    pagination={false}
-                    scroll={{ y: 360 }}
-                    dataSource={environment}
-                    columns={[
-                      {
-                        title: "Variable",
-                        dataIndex: "name",
-                        key: "name",
-                        render: (name: string) => <Typography.Text code>{name}</Typography.Text>,
-                      },
-                      { title: "Value", dataIndex: "value", key: "value" },
-                      {
-                        title: "Source",
-                        dataIndex: "source",
-                        key: "source",
-                        render: (source: RunEnvironmentEntry["source"]) => (
-                          <Tag color={source === "app.env" ? "purple" : source === "config.env" ? "blue" : "default"}>
-                            {source}
-                          </Tag>
-                        ),
-                      },
-                    ]}
-                  />
+                  <div className="run-environment">
+                    <div className="run-environment-toggle">
+                      <Typography.Text type="secondary">
+                        Show inherited process.env variables
+                      </Typography.Text>
+                      <Switch
+                        checked={showSystemVariables}
+                        onChange={setShowSystemVariables}
+                        aria-label="Show inherited process environment variables"
+                      />
+                    </div>
+                    <Table<RunEnvironmentEntry>
+                      size="small"
+                      rowKey="name"
+                      pagination={false}
+                      scroll={{ y: 360 }}
+                      dataSource={visibleEnvironment}
+                      columns={[
+                        {
+                          title: "Variable",
+                          dataIndex: "name",
+                          key: "name",
+                          render: (name: string) => <Typography.Text code>{name}</Typography.Text>,
+                        },
+                        { title: "Value", dataIndex: "value", key: "value" },
+                        {
+                          title: "Source",
+                          dataIndex: "source",
+                          key: "source",
+                          render: (source: RunEnvironmentEntry["source"]) => (
+                            <Tag color={source === "app.env" ? "purple" : source === "config.env" ? "blue" : "default"}>
+                              {source}
+                            </Tag>
+                          ),
+                        },
+                      ]}
+                    />
+                  </div>
                 ),
               },
             ]}
@@ -430,7 +477,13 @@ function RunsPage() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [busyRunId, setBusyRunId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? runs[0];
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navigationRunId = (location.state as { runId?: string } | null)?.runId;
+  const selectedRun =
+    runs.find((run) => run.id === selectedRunId) ??
+    runs.find((run) => run.id === navigationRunId) ??
+    runs[0];
   const finishedCount = runs.filter((run) =>
     run.status === "succeeded" || run.status === "failed" || run.status === "stopped",
   ).length;
@@ -475,6 +528,31 @@ function RunsPage() {
       setBusyRunId(null);
     }
   }
+
+  async function restartRun(run: RunSummary) {
+    setBusyRunId(run.id);
+    setActionError(null);
+    try {
+      const restarted = await api.startRun(run.appIndex, run.scriptName);
+      setSelectedRunId(restarted.id);
+      navigate("/runs", { state: { runId: restarted.id } });
+      await mutate();
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setBusyRunId(null);
+    }
+  }
+
+  const hasActiveDuplicate = selectedRun
+    ? runs.some(
+        (run) =>
+          run.id !== selectedRun.id &&
+          run.appIndex === selectedRun.appIndex &&
+          run.scriptName === selectedRun.scriptName &&
+          isRunActive(run.status),
+      )
+    : false;
 
   if (isLoading) return <Skeleton active paragraph={{ rows: 8 }} />;
   if (error) {
@@ -573,6 +651,8 @@ function RunsPage() {
               run={selectedRun}
               onStop={(runId) => void stopRun(runId)}
               onClean={(runId) => void cleanRun(runId)}
+              onRestart={(run) => void restartRun(run)}
+              hasActiveDuplicate={hasActiveDuplicate}
               isBusy={busyRunId === selectedRun.id}
             />
           ) : null}
