@@ -1,0 +1,8 @@
+{
+  "name": "velina-demo-frontend",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch server.ts",
+    "start": "bun server.ts"
+  }
+}

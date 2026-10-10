@@ -1,0 +1,163 @@
+body {
+  min-width: 360px;
+  min-height: 100vh;
+  background: #f5f6fa;
+}
+
+.page-content {
+  display: grid;
+  gap: 20px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 32px 40px;
+}
+
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-heading h3.ant-typography {
+  margin: 0 0 4px;
+}
+
+.app-script-panel {
+  display: grid;
+  gap: 18px;
+  padding: 8px 0;
+}
+
+.app-path {
+  overflow-wrap: anywhere;
+  color: #72798b;
+}
+
+.script-list {
+  display: grid;
+  gap: 12px;
+}
+
+.script-card {
+  border-color: #e9ecf3;
+}
+
+.script-command {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.runs-layout {
+  display: grid;
+  grid-template-columns: minmax(250px, 330px) minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.run-list-card,
+.run-detail-card {
+  min-width: 0;
+  border-color: #e9ecf3;
+}
+
+.run-list-card .ant-card-body {
+  max-height: 72vh;
+  overflow: auto;
+}
+
+.run-list {
+  display: grid;
+  gap: 10px;
+}
+
+.run-list-item {
+  position: relative;
+  border-color: #eceef4;
+}
+
+.run-list-item.selected {
+  border-color: #5965d8;
+  background: #f7f8ff;
+}
+
+.run-list-item .ant-card-body {
+  display: grid;
+  max-height: none;
+  gap: 8px;
+  padding: 12px;
+  overflow: visible;
+}
+
+.run-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.run-list-time {
+  font-size: 12px;
+}
+
+.run-list-remove {
+  justify-self: end;
+}
+
+.run-detail-card .ant-card-head-title {
+  min-width: 0;
+}
+
+.run-output-tabs {
+  margin-top: 16px;
+}
+
+.run-output-container {
+  display: grid;
+  gap: 8px;
+}
+
+.run-output-truncated {
+  margin-bottom: 4px;
+}
+
+.run-output {
+  min-height: 220px;
+  max-height: 55vh;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid #20283a;
+  border-radius: 8px;
+  background: #111827;
+  color: #e6edf3;
+  font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.run-detail-card .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .runs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .run-list-card .ant-card-body {
+    max-height: 40vh;
+  }
+}
+
+@media (max-width: 600px) {
+  .page-content {
+    padding: 20px 16px 32px;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

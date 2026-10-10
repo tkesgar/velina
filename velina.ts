@@ -2,6 +2,7 @@ import { RpcTarget } from "capnweb";
 import path from "node:path";
 import fs from "node:fs";
 import * as z from "zod";
+import { RunManager } from "./run-manager";
 
 type VelinaVar =
   | string
@@ -36,15 +37,15 @@ const configSchema = z.object({
       z.object({
         path: z.string(),
         name: z.string().optional(),
-        env: z.record(z.string(), z.string().nullable()),
-        scripts: z.record(z.string(), z.string()),
+        env: z.record(z.string(), z.string().nullable()).optional(),
+        scripts: z.record(z.string(), z.string()).optional(),
         files: z.array(
           z.object({
             path: z.string(),
             content: z.string(),
-            writeOn: z.union([z.literal('script-run'), z.literal('init')])
+            writeOn: z.union([z.literal('script-run'), z.literal('init')]).optional()
           })
-        )
+        ).optional()
       })
     ])
   ).optional()
@@ -135,8 +136,8 @@ export function resolveConfig(
       return {
         path: partialApp.path,
         name: partialApp.name || path.basename(partialApp.path),
-        scripts: { ...partialApp.scripts },
-        env: { ...partialApp.env },
+        scripts: { ...(partialApp.scripts ?? {}) },
+        env: { ...(partialApp.env ?? {}) },
         files: (partialApp.files ?? []).map(file => {
           return {
             ...file,
@@ -201,6 +202,7 @@ export function resolveConfig(
 }
 
 export class Velina {
+  readonly runs: RunManager;
   readonly config: {
     cwd: string
     path: string
@@ -241,6 +243,7 @@ export class Velina {
       partial: partial || null,
       resolved,
     }
+    this.runs = new RunManager(cwd, resolved)
   }
 }
 
@@ -254,5 +257,29 @@ export class VelinaApi extends RpcTarget {
 
   getConfig() {
     return this.velina.config;
+  }
+
+  getRuns() {
+    return this.velina.runs.listRuns();
+  }
+
+  startRun(appIndex: number, scriptName: string) {
+    return this.velina.runs.startRun(appIndex, scriptName);
+  }
+
+  watchRun(runId: string) {
+    return this.velina.runs.watchRun(runId);
+  }
+
+  stopRun(runId: string) {
+    return this.velina.runs.stopRun(runId);
+  }
+
+  cleanRun(runId: string) {
+    return this.velina.runs.cleanRun(runId);
+  }
+
+  cleanFinishedRuns() {
+    return this.velina.runs.cleanFinishedRuns();
   }
 }

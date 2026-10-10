@@ -19,11 +19,21 @@ const velina = new Velina()
 const rpcHandler = newBunWebSocketRpcHandler(() => new VelinaApi(velina))
 
 const port = getPort(Bun.argv.slice(2));
-Bun.serve({
+const server = Bun.serve({
+  hostname: "127.0.0.1",
   port,
   routes: {
     "/dashboard": dashboard,
     "/api": (request, server) => {
+      const requestUrl = new URL(request.url);
+      const origin = request.headers.get("origin");
+      if (
+        !["localhost", "127.0.0.1"].includes(requestUrl.hostname) ||
+        origin !== requestUrl.origin
+      ) {
+        return new Response("Forbidden", { status: 403 });
+      }
+
       if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
         return new Response("WebSocket upgrade required", {
           status: 426,
@@ -50,3 +60,14 @@ Bun.serve({
 });
 
 console.log(`Velina is running at http://localhost:${port}`);
+
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await velina.runs.stopAllRuns();
+  server.stop(true);
+}
+
+process.once("SIGINT", () => void shutdown());
+process.once("SIGTERM", () => void shutdown());

@@ -11,14 +11,15 @@ bun add -g github:tkesgar/velina
 ## Usage
 
 ```sh
-# Starts the web UI at http://localhost:2209/dashboard#/services
+# Starts the web UI at http://localhost:2209/dashboard#/apps
 $ velina
 
 # Override the listening port
 $ velina --port 3000
 ```
 
-The app is run directly from TypeScript by Bun; there is no build or publish step.
+Development runs `server.ts` directly with Bun. `bun run build` creates the CLI
+executable at `dist/velina`.
 
 ## Development
 
@@ -28,13 +29,29 @@ bun run dev
 ```
 
 The UI lives at `/dashboard` and uses hash-based React Router navigation:
-`/dashboard#/services` and `/dashboard#/runs`. `/api` uses Cap'n Web WebSocket
-RPC to expose Velina's API. Visiting `/` redirects to `/dashboard`.
+`/dashboard#/apps`, `/dashboard#/runs`, and `/dashboard#/config`. `/api` uses
+Cap'n Web WebSocket RPC to expose Velina's API. Visiting `/` redirects to `/dashboard`.
+
+## Apps and runs
+
+When `apps` is omitted from `.velina.yml`, Velina discovers app directories under
+`./apps` and reads their scripts from `package.json`. The demo apps are:
+
+- `apps/backend`: serves `GET /api/hello` on port `3011` by default.
+- `apps/frontend`: serves a page on port `3012` that calls the backend.
+
+Run scripts from the **Apps** tab. The **Runs** tab streams stdout and stderr,
+shows the effective environment, and lets you stop or remove runs. Environment
+values are merged in this order: Velina's `process.env`, top-level `env`, then
+app-level `env`; a `null` value removes an inherited variable.
+
+Run history and output are kept in memory only and disappear when Velina exits.
+To keep memory bounded, each run retains up to the most recent 256 Ki characters
+of stdout and stderr. Older runs can be removed individually or cleared together.
 
 ## Configuration
 
-The following is the planned configuration shape for managing multiple apps. It
-is not read by the current starter UI yet.
+Velina reads `.velina.yml` from the current project directory. For example:
 
 ```yaml
 # Where you want Velina to run
