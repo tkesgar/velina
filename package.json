@@ -4,11 +4,12 @@
   "description": "A small UI to run commands, useful for monorepos.",
   "type": "module",
   "bin": {
-    "velina": "./server.ts"
+    "velina": "./dist/velina"
   },
   "scripts": {
     "dev": "bun --hot server.ts",
-    "start": "bun server.ts"
+    "start": "bun server.ts",
+    "build": "bun build --compile --production server.ts --outfile dist/velina"
   },
   "dependencies": {
     "antd": "^6.6.5",
