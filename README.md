@@ -28,9 +28,8 @@ bun run dev
 ```
 
 The UI lives at `/dashboard` and uses hash-based React Router navigation:
-`/dashboard#/services` and `/dashboard#/runs`. `/api` uses Cap'n Web HTTP batch
-RPC; the `hello(name)` method remains as a small end-to-end example. Visiting `/`
-redirects to `/dashboard`.
+`/dashboard#/services` and `/dashboard#/runs`. `/api` uses Cap'n Web WebSocket
+RPC to expose Velina's API. Visiting `/` redirects to `/dashboard`.
 
 ## Configuration
 

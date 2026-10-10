@@ -1,0 +1,6 @@
+{
+  "scripts": {
+    "dev": "bun dev",
+    "start": "bun start"
+  }
+}
