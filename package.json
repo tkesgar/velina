@@ -1,0 +1,23 @@
+{
+  "name": "velina",
+  "version": "0.1.0",
+  "description": "A small UI to run commands, useful for monorepos.",
+  "type": "module",
+  "bin": {
+    "velina": "./main.ts"
+  },
+  "scripts": {
+    "dev": "bun --hot main.ts"
+  },
+  "dependencies": {
+    "antd": "^6.6.5",
+    "capnweb": "^0.12.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0"
+  }
+}
