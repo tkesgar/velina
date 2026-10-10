@@ -5,7 +5,7 @@ import * as z from "zod";
 import { RunManager } from "./run-manager";
 
 type VelinaVar =
-  | string
+  | { type: 'static'; value: string }
   | { type: "command"; value: string }
   | { type: "script"; value: string };
 
@@ -16,6 +16,10 @@ const configSchema = z.object({
       z.string(),
       z.union([
         z.string(),
+        z.object({
+          type: z.literal("static"),
+          value: z.string(),
+        }),
         z.object({
           type: z.literal("command"),
           value: z.string(),
@@ -43,7 +47,6 @@ const configSchema = z.object({
           z.object({
             path: z.string(),
             content: z.string(),
-            writeOn: z.union([z.literal('script-run'), z.literal('init')]).optional()
           })
         ).optional()
       })
@@ -53,7 +56,7 @@ const configSchema = z.object({
 
 export interface PartialVelinaConfig {
   port?: number;
-  var?: Record<string, VelinaVar>;
+  var?: Record<string, string | VelinaVar>;
   env?: Record<string, string | null>;
   apps?: Array<string | {
     path: string
@@ -63,7 +66,6 @@ export interface PartialVelinaConfig {
     files?: Array<{
       path: string
       content: string
-      writeOn?: 'script-run' | 'init'
     }>
   }>
 }
@@ -80,7 +82,6 @@ export interface VelinaConfig {
       files: Array<{
         path: string
         content: string
-        writeOn: 'script-run' | 'init'
       }>
     }>;
 }
@@ -120,7 +121,19 @@ export function resolveConfig(
 
   const resolvedConfig: VelinaConfig = {
     port: Number(Bun.env.PORT) || partialConfig?.port || 2209,
-    var: partialConfig?.var || {},
+    var: Object.fromEntries(
+      Object.entries(partialConfig?.var ?? {})
+      .map(([key, value]) => {
+        if (typeof value === 'string') {
+          return [key, {
+            type: 'static' as const,
+            value,
+          }]
+        }
+
+        return [key, value]
+      })
+    ),
     env: partialConfig?.env || {},
     apps: (partialConfig?.apps ?? []).map(partialApp => {
       if (typeof partialApp === 'string') {
@@ -138,12 +151,7 @@ export function resolveConfig(
         name: partialApp.name || path.basename(partialApp.path),
         scripts: { ...(partialApp.scripts ?? {}) },
         env: { ...(partialApp.env ?? {}) },
-        files: (partialApp.files ?? []).map(file => {
-          return {
-            ...file,
-            writeOn: file.writeOn ?? 'script-run'
-          }
-        })
+        files: partialApp.files ?? []
       }
     })
   };
