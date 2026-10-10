@@ -11,7 +11,7 @@ bun add -g github:tkesgar/velina
 ## Usage
 
 ```sh
-# Starts the web UI at http://localhost:2209
+# Starts the web UI at http://localhost:2209/dashboard#/services
 $ velina
 
 # Override the listening port
@@ -27,13 +27,15 @@ bun install
 bun run dev
 ```
 
-The `/api` endpoint uses Cap'n Web HTTP batch RPC. The initial `hello(name)` method
-is a small end-to-end example; the UI is built with React and Ant Design.
+The UI lives at `/dashboard` and uses hash-based React Router navigation:
+`/dashboard#/services` and `/dashboard#/runs`. `/api` uses Cap'n Web HTTP batch
+RPC; the `hello(name)` method remains as a small end-to-end example. Visiting `/`
+redirects to `/dashboard`.
 
 ## Configuration
 
 The following is the planned configuration shape for managing multiple apps. It
-is not read by the initial hello-world app yet.
+is not read by the current starter UI yet.
 
 ```yaml
 # Where you want Velina to run

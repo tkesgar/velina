@@ -13,7 +13,8 @@
     "antd": "^6.6.5",
     "capnweb": "^0.12.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-router": "^8.4.0"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",

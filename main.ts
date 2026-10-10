@@ -28,7 +28,9 @@ Bun.serve({
   routes: {
     "/api": async (request) =>
       newHttpBatchRpcResponse(request, new VelinaApi()),
-    "/": index,
+    "/": (request) =>
+      Response.redirect(new URL("/dashboard", request.url), 307),
+    "/dashboard": index,
   },
   fetch() {
     return new Response("Not found", { status: 404 });
