@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "A small UI to run commands, useful for monorepos.",
   "type": "module",
+  "workspaces": ["apps/*"],
   "bin": {
     "velina": "./dist/velina"
   },

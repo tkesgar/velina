@@ -1,6 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
-import type { VelinaConfig } from "./velina";
+import type { NormalizedScript, VelinaConfig } from "./velina";
 
 const MAX_LOG_CHARS = 256 * 1024;
 const MAX_QUEUED_EVENT_CHARS = 512 * 1024;
@@ -25,6 +25,7 @@ export interface RunSummary {
   appIndex: number;
   appName: string;
   scriptName: string;
+  scriptType: NormalizedScript["type"];
   cwd: string;
   pid: number | null;
   status: RunStatus;
@@ -156,7 +157,7 @@ export class RunManager {
       );
     }
 
-    const command = app.scripts[scriptName];
+    const script = app.scripts[scriptName];
     const cwd = path.resolve(this.projectRoot, app.path);
     if (!fs.statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) {
       throw new Error(`App directory does not exist: ${cwd}`);
@@ -172,6 +173,7 @@ export class RunManager {
       appIndex,
       appName: app.name,
       scriptName,
+      scriptType: script.type,
       cwd,
       pid: null,
       status: "starting",
@@ -192,9 +194,16 @@ export class RunManager {
     this.runs.set(run.id, run);
 
     try {
-      const commandLine = process.platform === "win32"
-        ? [process.env.ComSpec || "cmd.exe", "/d", "/s", "/c", command]
-        : ["/bin/sh", "-c", command];
+      let commandLine: string[];
+      if (script.type === "package-script") {
+        const bunExecutable = Bun.which("bun");
+        if (!bunExecutable) throw new Error("Could not find Bun to run this package script");
+        commandLine = [bunExecutable, "run", scriptName];
+      } else {
+        commandLine = process.platform === "win32"
+          ? [this.processEnvironment.ComSpec || "cmd.exe", "/d", "/s", "/c", script.value]
+          : ["/bin/sh", "-c", script.value];
+      }
       const child = Bun.spawn(commandLine, {
         cwd,
         env: Object.fromEntries(environment.map(({ name, value }) => [name, value])),
@@ -319,6 +328,7 @@ export class RunManager {
       appIndex: run.appIndex,
       appName: run.appName,
       scriptName: run.scriptName,
+      scriptType: run.scriptType,
       cwd: run.cwd,
       pid: run.pid,
       status: run.status,

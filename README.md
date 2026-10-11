@@ -38,11 +38,13 @@ When `apps` is omitted from `.velina.yml`, Velina discovers app directories unde
 `./apps` and reads their scripts from `package.json`. The demo apps are:
 
 - `apps/backend`: serves `GET /api/hello` on port `3011` by default.
-- `apps/frontend`: serves a page on port `3012` that calls the backend.
+- `apps/frontend`: a Vite/React page on port `3012` that calls the backend.
 
 Run scripts from the **Apps** tab. The **Runs** tab streams stdout and stderr,
 shows the effective environment, and lets you stop or remove runs. Only one
 instance of an app's script can run at a time; finished runs can be restarted.
+Scripts discovered in an app's `package.json` run through `bun run <script>`;
+scripts declared directly in `.velina.yml` run as shell commands.
 Inherited `process.env` values can be toggled in the environment view. Environment
 values are merged in this order: Velina's `process.env`, top-level `env`, then
 app-level `env`; a `null` value removes an inherited variable.

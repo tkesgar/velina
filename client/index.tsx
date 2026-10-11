@@ -156,7 +156,7 @@ function AppsPage() {
                   />
                 ) : (
                   <div className="script-list">
-                    {Object.entries(app.scripts).map(([scriptName, command]) => {
+                    {Object.entries(app.scripts).map(([scriptName, script]) => {
                       const key = `${appIndex}:${scriptName}`;
                       const activeRun = runs.find(
                         (run) =>
@@ -169,7 +169,14 @@ function AppsPage() {
                           key={scriptName}
                           size="small"
                           className="script-card"
-                          title={<Typography.Text code>{scriptName}</Typography.Text>}
+                          title={
+                            <Space>
+                              <Typography.Text code>{scriptName}</Typography.Text>
+                              <Tag color={script.type === "package-script" ? "blue" : "default"}>
+                                {script.type === "package-script" ? "package script" : "command"}
+                              </Tag>
+                            </Space>
+                          }
                           extra={
                             activeRun ? (
                               <Space>
@@ -194,7 +201,7 @@ function AppsPage() {
                           }
                         >
                           <Typography.Text className="script-command" code>
-                            {command}
+                            {script.value}
                           </Typography.Text>
                         </Card>
                       );

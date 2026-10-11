@@ -11,6 +11,11 @@ type VelinaVar =
   | { type: "command"; value: string }
   | { type: "script"; value: string };
 
+export interface NormalizedScript {
+  type: "command" | "package-script";
+  value: string;
+}
+
 interface ConfiguredFile {
   path: string;
   content: string;
@@ -20,7 +25,7 @@ interface NormalizedApp {
   path: string;
   name: string;
   env: Record<string, string | null>;
-  scripts: Record<string, string>;
+  scripts: Record<string, NormalizedScript>;
   files: ConfiguredFile[];
 }
 
@@ -105,7 +110,7 @@ export interface VelinaConfig {
       path: string;
       name: string;
       env: Record<string, string | null>;
-      scripts: Record<string, string>;
+      scripts: Record<string, NormalizedScript>;
       files: ResolvedFile[];
     }>;
 }
@@ -175,7 +180,12 @@ export function resolveConfig(
       return {
         path: partialApp.path,
         name: partialApp.name || path.basename(partialApp.path),
-        scripts: { ...(partialApp.scripts ?? {}) },
+        scripts: Object.fromEntries(
+          Object.entries(partialApp.scripts ?? {}).map(([name, value]) => [
+            name,
+            { type: "command" as const, value },
+          ]),
+        ),
         env: { ...(partialApp.env ?? {}) },
         files: (partialApp.files ?? []).map((file) => ({ ...file })),
       }
@@ -219,7 +229,7 @@ export function resolveConfig(
             continue
           }
 
-          app.scripts[name] = command;
+          app.scripts[name] = { type: "package-script", value: command };
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
