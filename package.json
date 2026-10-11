@@ -14,6 +14,8 @@
   "dependencies": {
     "antd": "^6.6.5",
     "capnweb": "^0.12.0",
+    "eta": "^4.6.0",
+    "ignore": "^7.0.12",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^8.4.0",

@@ -64,18 +64,22 @@ port: 2209
 var:
   # Define a simple key-value string
   foo: abc123
+  # Or define a static value explicitly
+  bar_static:
+    type: static
+    value: abc123
   # Get value from script
-  bar:
+  bar_script:
     type: script
     value: crypto.randomUUID()
   # Get values from shell
-  baz:
+  baz_command:
     type: command
     value: openssl rand -base64 16
 
 # Shared environment variables for all apps
-# Refer to vars with <%= var.foo %>
-# Refer to other envs with <%= env.ARIA_URL %>
+# Refer to variables with <%= it.var.foo %>
+# Refer to other envs with <%= it.env.ARIA_URL %>
 env:
   SUNNA_URL: http://localhost:9001
   ARIA_URL: htpp://localhost:9002
@@ -92,19 +96,37 @@ apps:
     # App-specific environment variables
     env:
       PORT: 9002
-      BASE_URL: <%= env.ARIA_URL %>
-      OAUTH_JWT_AUDIENCE: <%= env.SUNNA_URL %>
-      OAUTH_REDIRECT_URL: <%= env.NANGONGYU_URL %>
+      BASE_URL: <%= it.env.ARIA_URL %>
+      OAUTH_JWT_AUDIENCE: <%= it.env.SUNNA_URL %>
+      OAUTH_REDIRECT_URL: <%= it.env.NANGONGYU_URL %>
       # Prevent inheriting specific variables from shared env
       NODE_ENV: null
     # Specify files to be written before running any of the scripts
     files:
       - path: ./config.json
         content: >
-          Hello world! <%= env.ARIA_URL %>
+          Hello world! <%= it.env.ARIA_URL %>
     # scripts is read from package.json if exists in the path (pre* and post* is excluded)
     # Override scripts by specifying it here
-    # Can use vars and envs here
     scripts:
-      start: BASE_URL="<%= env.ARIA_URL %>" bun server.ts
+      start: bun server.ts
 ```
+
+Variables are evaluated once when Velina starts. Script values are JavaScript
+expressions evaluated by Bun; command values run in a shell and use trimmed
+stdout. Failures stop startup with the variable name in the error.
+
+Environment values and file contents are rendered once with Eta. Templates use
+`<%= it.var.foo %>` and `<%= it.env.NAME %>`. Top-level `env` templates see the
+Velina process environment; app-level templates also see resolved top-level env.
+File templates see the effective environment for their app.
+
+Files declared in `files` are written at startup. Velina also finds `*.example`
+files under each app and maps `config/.env.example` to `config/.env`, but only
+when the generated target is ignored by the project’s `.gitignore`. Generated
+files are overwritten at startup; explicitly declared files take precedence over
+an example targeting the same path.
+
+`script` variables execute JavaScript and `command` variables execute shell
+commands automatically during startup. Treat `.velina.yml` and its Eta templates
+as trusted code.

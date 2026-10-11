@@ -3,10 +3,12 @@ import { newBunWebSocketRpcHandler } from "capnweb";
 import dashboard from "./client/index.html";
 import { Velina, VelinaApi } from "./velina";
 
-function getPort(args: string[]) {
+function getPortOverride(args: string[]): number | undefined {
   const portIndex = args.findIndex((arg) => arg === "--port" || arg === "-p");
-  const portValue = portIndex === -1 ? undefined : args[portIndex + 1];
-  const port = portValue === undefined ? 2209 : Number(portValue);
+  if (portIndex === -1) return undefined;
+
+  const portValue = args[portIndex + 1];
+  const port = portValue === undefined ? Number.NaN : Number(portValue);
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error(`Invalid port: ${portValue ?? ""}`);
@@ -15,10 +17,11 @@ function getPort(args: string[]) {
   return port;
 }
 
-const velina = new Velina()
+const portOverride = getPortOverride(Bun.argv.slice(2));
+const velina = await Velina.create()
 const rpcHandler = newBunWebSocketRpcHandler(() => new VelinaApi(velina))
 
-const port = getPort(Bun.argv.slice(2));
+const port = portOverride ?? velina.config.resolved.port;
 const server = Bun.serve({
   hostname: "127.0.0.1",
   port,

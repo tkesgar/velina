@@ -84,7 +84,7 @@ function isActive(status: RunStatus) {
 }
 
 function resolveEnvironment(
-  parent: NodeJS.ProcessEnv,
+  parent: Record<string, string>,
   shared: Record<string, string | null>,
   app: Record<string, string | null>,
 ): RunEnvironmentEntry[] {
@@ -123,6 +123,7 @@ export class RunManager {
   constructor(
     private readonly projectRoot: string,
     private readonly config: VelinaConfig,
+    private readonly processEnvironment: Record<string, string>,
   ) {}
 
   listRuns(): RunSummary[] {
@@ -161,7 +162,11 @@ export class RunManager {
       throw new Error(`App directory does not exist: ${cwd}`);
     }
 
-    const environment = resolveEnvironment(process.env, this.config.env, app.env);
+    const environment = resolveEnvironment(
+      this.processEnvironment,
+      this.config.env,
+      app.env,
+    );
     const run: RunRecord = {
       id: crypto.randomUUID(),
       appIndex,
