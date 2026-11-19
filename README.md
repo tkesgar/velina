@@ -89,10 +89,10 @@ files:
       Hello <%= it.var.VAR2 %>!
   - path: ./foo
     cmd: openssl genpkey -algorithm ed25519
-# Path to repository dir to scan for tasks.
+# Path to root directory to scan for tasks.
 # Set to null to disable scanning for tasks.
 # Default: current working directory
-repositoryDir: .
+rootDir: .
 # Provide the list of tasks.
 # Note that tasks with the same name defined here overrides scanned tasks.
 tasks:
