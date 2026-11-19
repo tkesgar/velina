@@ -1,0 +1,8 @@
+{
+  "name": "@tkesgar/velina",
+  "private": true,
+  "bin": {
+    "velina": "./velina.ts",
+    "velina-cli": "./velina-cli.ts"
+  }
+}
