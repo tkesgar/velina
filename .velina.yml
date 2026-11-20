@@ -1,0 +1,9 @@
+# Velina config for this repository.
+# The `loop` task runs until stopped, which makes it handy for testing
+# the Stop button in the web UI.
+tasks:
+  loop:
+    cmd: bun
+    args:
+      - -e
+      - "console.log('loop started'); setInterval(() => console.log('tick'), 1000)"

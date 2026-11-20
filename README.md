@@ -173,8 +173,8 @@ Within `env` entries, `env` refers to the inherited environment; within files, i
 
 The web UI is served at `/ui/` on the server's port, for example `http://127.0.0.1:2222/ui/`. It redirects to `/ui/tasks`.
 
-- `/ui/tasks` lists all available tasks, shows whether one has a running process, and lets you start a task and view its logs.
-- `/ui/processes` lists running and stopped processes, shows details and logs, and lets you restart or clean them up.
+- `/ui/tasks` lists all available tasks, shows whether one has a running process, and lets you start or stop a task and view its logs.
+- `/ui/processes` lists running and stopped processes, shows details and logs, and lets you stop, restart, or clean them up.
 - `/ui/config` shows both the provided and fully resolved configuration.
 
 The UI is built by Bun directly from `web/index.html`; there is no separate frontend build or dev server. Run `velina --dev` to enable hot reloading while working on it. The header has a light/dark switcher whose choice is stored in local storage.

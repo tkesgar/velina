@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Flex, Grid, Heading, HStack, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { FiPlay, FiTerminal } from "react-icons/fi";
+import { FiPlay, FiSquare, FiTerminal } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
 import type { LogType } from "../../../lib/api";
@@ -26,20 +26,23 @@ export function TasksPage() {
   const selectedName = requestedName && requestedName in tasks ? requestedName : names[0];
   const selectedTask = selectedName ? tasks[selectedName] : undefined;
 
-  const runningProcess = processes.find(
-    (process) => process.taskName === selectedName && process.state === "running",
-  );
+  const runningFor = (name: string) =>
+    processes.find((process) => process.taskName === name && process.state === "running");
+  const runningProcess = selectedName ? runningFor(selectedName) : undefined;
   const { lines, error: logError } = useProcessLogs(runningProcess?.id ?? null, logType);
 
-  async function start(name: string) {
+  async function act(action: () => Promise<unknown>) {
     try {
       setActionError(null);
-      await Promise.resolve(api.startTask(name));
+      await action();
       await refresh();
     } catch (cause) {
       setActionError(describe(cause));
     }
   }
+
+  const start = (name: string) => act(() => api.startTask(name));
+  const stop = (id: string) => act(() => api.stopProcess(id));
 
   return (
     <Box>
@@ -65,9 +68,8 @@ export function TasksPage() {
             </Table.Header>
             <Table.Body>
               {names.map((name) => {
-                const isRunning = processes.some(
-                  (process) => process.taskName === name && process.state === "running",
-                );
+                const process = runningFor(name);
+                const isRunning = Boolean(process);
                 return (
                   <Table.Row key={name}>
                     <Table.Cell>
@@ -85,12 +87,26 @@ export function TasksPage() {
                       </Badge>
                     </Table.Cell>
                     <Table.Cell>
-                      <Button size="xs" disabled={isRunning} onClick={() => void start(name)}>
-                        <HStack as="span" gap="1">
-                          <FiPlay aria-hidden="true" />
-                          Start
-                        </HStack>
-                      </Button>
+                      {process ? (
+                        <Button
+                          size="xs"
+                          colorPalette="orange"
+                          variant="outline"
+                          onClick={() => void stop(process.id)}
+                        >
+                          <HStack as="span" gap="1">
+                            <FiSquare aria-hidden="true" />
+                            Stop
+                          </HStack>
+                        </Button>
+                      ) : (
+                        <Button size="xs" onClick={() => void start(name)}>
+                          <HStack as="span" gap="1">
+                            <FiPlay aria-hidden="true" />
+                            Start
+                          </HStack>
+                        </Button>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 );
@@ -108,16 +124,26 @@ export function TasksPage() {
                 <Badge colorPalette={runningProcess ? "green" : "gray"}>
                   {runningProcess ? "running" : "idle"}
                 </Badge>
-                <Button
-                  size="sm"
-                  disabled={Boolean(runningProcess)}
-                  onClick={() => void start(selectedName)}
-                >
-                  <HStack as="span" gap="1">
-                    <FiPlay aria-hidden="true" />
-                    Start
-                  </HStack>
-                </Button>
+                {runningProcess ? (
+                  <Button
+                    size="sm"
+                    colorPalette="orange"
+                    variant="outline"
+                    onClick={() => void stop(runningProcess.id)}
+                  >
+                    <HStack as="span" gap="1">
+                      <FiSquare aria-hidden="true" />
+                      Stop
+                    </HStack>
+                  </Button>
+                ) : (
+                  <Button size="sm" onClick={() => void start(selectedName)}>
+                    <HStack as="span" gap="1">
+                      <FiPlay aria-hidden="true" />
+                      Start
+                    </HStack>
+                  </Button>
+                )}
               </Flex>
 
               <Text mb="1">

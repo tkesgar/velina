@@ -1,6 +1,6 @@
 import { Badge, Box, Button, Flex, Grid, Heading, HStack, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { FiChevronRight, FiRefreshCw, FiTerminal, FiTrash2 } from "react-icons/fi";
+import { FiChevronRight, FiRefreshCw, FiSquare, FiTerminal, FiTrash2 } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
 import type { LogType, ProcessInfo } from "../../../lib/api";
@@ -101,6 +101,18 @@ export function ProcessesPage() {
                   <Table.Cell>{process.exitCode ?? "—"}</Table.Cell>
                   <Table.Cell>
                     <Flex gap="1">
+                      <Button
+                        size="xs"
+                        colorPalette="orange"
+                        variant="outline"
+                        disabled={process.state === "stopped"}
+                        onClick={() => void run(() => api.stopProcess(process.id))}
+                      >
+                        <HStack as="span" gap="1">
+                          <FiSquare aria-hidden="true" />
+                          Stop
+                        </HStack>
+                      </Button>
                       <Button
                         size="xs"
                         disabled={
