@@ -78,6 +78,19 @@ describe("Velina", () => {
       expect(velina.getConfig()).toBe(config);
       expect(velina.getConfig().provided).toEqual({});
     });
+
+    it("should return the config as YAML when requested", () => {
+      const velina = createVelina({
+        provided: { port: 1234, vars: { GREETING: "hello" } },
+        resolved: { port: 1234, vars: {}, env: {}, files: [], tasks: {} },
+      });
+
+      const yaml = velina.getConfig({ format: "yaml" });
+
+      expect(yaml.provided).toContain("port: 1234");
+      expect(yaml.provided).toContain("GREETING: hello");
+      expect(yaml.resolved).toContain("port: 1234");
+    });
   });
 
   describe("startTask", () => {

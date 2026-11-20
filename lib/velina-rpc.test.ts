@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { newHttpBatchRpcSession, newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { Subprocess } from "bun";
 
-import type { LogEntry, VelinaApi } from "./api";
+import { isYamlConfig, type LogEntry, type VelinaApi } from "./api";
 
 const projectRoot = path.join(import.meta.dir, "..");
 
@@ -113,10 +113,19 @@ afterAll(async () => {
 describe("Velina RPC", () => {
   it("should return the provided and resolved config over WebSocket", async () => {
     const config = await api.getConfig();
+    if (isYamlConfig(config)) throw new Error("Expected object config");
 
     expect(config.provided).toEqual({ port, tasks: expect.any(Object) });
     expect(config.resolved.port).toBe(port);
     expect(Object.keys(config.resolved.tasks)).toContain("greet");
+  });
+
+  it("should return the config as YAML over RPC", async () => {
+    const config = await api.getConfig({ format: "yaml" });
+    if (!isYamlConfig(config)) throw new Error("Expected YAML config");
+
+    expect(config.provided).toContain("port:");
+    expect(config.resolved).toContain("port:");
   });
 
   it("should start a task, stream its logs, then stop and delete it", async () => {
@@ -158,6 +167,8 @@ describe("Velina RPC", () => {
     const batch = newHttpBatchRpcSession<VelinaApi>(`http://127.0.0.1:${port}/api`);
 
     const config = await batch.getConfig();
+    if (isYamlConfig(config)) throw new Error("Expected object config");
+
     expect(config.resolved.port).toBe(port);
   });
 });

@@ -2,10 +2,10 @@ import { Box, Grid, Heading, Spinner, Text } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiSettings } from "react-icons/fi";
 
 import { ConfigView } from "../components/config-view";
-import { useConfig } from "../lib/hooks";
+import { useYamlConfig } from "../lib/hooks";
 
 export function ConfigPage() {
-  const { config, error } = useConfig();
+  const { config, error } = useYamlConfig();
 
   return (
     <Box>

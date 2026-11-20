@@ -1,7 +1,7 @@
 import { RpcTarget } from "capnweb";
 import * as z from "zod";
 
-import type { LogEntry, LogType, ProcessInfo, VelinaApi } from "./api";
+import type { LogEntry, LogType, ProcessInfo, VelinaApi, YamlConfig } from "./api";
 import type { LoadedConfig } from "./config";
 import type { Velina } from "./velina";
 
@@ -18,7 +18,11 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
     this.#velina = velina;
   }
 
-  getConfig(): LoadedConfig {
+  getConfig(opts?: { format?: "yaml" }): LoadedConfig | YamlConfig {
+    if (opts?.format === "yaml") {
+      return this.#velina.getConfig({ format: "yaml" });
+    }
+
     return this.#velina.getConfig();
   }
 

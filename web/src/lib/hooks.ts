@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
-import type { LogEntry, LogType, ProcessInfo } from "../../../lib/api";
+import {
+  isYamlConfig,
+  type LogEntry,
+  type LogType,
+  type ProcessInfo,
+  type YamlConfig,
+} from "../../../lib/api";
 import type { LoadedConfig } from "../../../lib/config";
 import { useVelina } from "./velina-context";
 
@@ -22,6 +28,43 @@ export function useConfig() {
     void Promise.resolve(api.getConfig()).then(
       (value) => {
         if (!active) return;
+        if (isYamlConfig(value)) {
+          setError("Unexpected config format");
+          return;
+        }
+
+        setConfig(value);
+        setError(null);
+      },
+      (cause: unknown) => {
+        if (active) setError(errorMessage(cause));
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  return { config, error };
+}
+
+export function useYamlConfig() {
+  const { api } = useVelina();
+  const [config, setConfig] = useState<YamlConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    void Promise.resolve(api.getConfig({ format: "yaml" })).then(
+      (value) => {
+        if (!active) return;
+        if (!isYamlConfig(value)) {
+          setError("Unexpected config format");
+          return;
+        }
+
         setConfig(value);
         setError(null);
       },

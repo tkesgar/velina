@@ -168,6 +168,7 @@ import type { VelinaApi } from "./lib/api";
 using api = newWebSocketRpcSession<VelinaApi>("ws://127.0.0.1:2222/api");
 
 const { provided, resolved } = await api.getConfig();
+const yaml = await api.getConfig({ format: "yaml" }); // { provided: string, resolved: string }
 const process = await api.startTask("backend:dev");
 
 for await (const entry of await api.streamProcessLogs(process.id, "stdout")) {
@@ -178,15 +179,15 @@ await api.stopProcess(process.id);
 api.deleteProcess(process.id);
 ```
 
-| Function                      | Description                                                                                                                   |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `getConfig()`                 | `{ provided, resolved }`: the parsed config and the fully resolved config, including all available tasks.                     |
-| `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                 |
-| `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                   |
-| `getProcess(id)`              | Details for one process.                                                                                                      |
-| `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops. |
-| `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.        |
-| `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                |
+| Function                      | Description                                                                                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getConfig(opts?)`            | `{ provided, resolved }`: the parsed config and the fully resolved config, including all available tasks. Pass `{ format: "yaml" }` to receive both as YAML strings. |
+| `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                                                        |
+| `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                                                          |
+| `getProcess(id)`              | Details for one process.                                                                                                                                             |
+| `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops.                                        |
+| `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.                                               |
+| `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                                                       |
 
 A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, and `cwd`. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
 

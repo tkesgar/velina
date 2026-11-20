@@ -24,8 +24,17 @@ export interface ProcessInfo {
 
 // Shared between the server target and the CLI client. Cap'n Web needs no
 // generated interface: this is the API description.
+export interface YamlConfig {
+  provided: string;
+  resolved: string;
+}
+
+export function isYamlConfig(value: LoadedConfig | YamlConfig): value is YamlConfig {
+  return typeof value.provided === "string";
+}
+
 export interface VelinaApi {
-  getConfig(): LoadedConfig;
+  getConfig(opts?: { format?: "yaml" }): LoadedConfig | YamlConfig;
   startTask(name: string): ProcessInfo;
   getAllProcesses(): ProcessInfo[];
   getProcess(id: string): ProcessInfo;

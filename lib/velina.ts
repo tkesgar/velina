@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Subprocess } from "bun";
 
-import type { LogEntry, LogType, ProcessInfo, VelinaApi } from "./api";
+import type { LogEntry, LogType, ProcessInfo, VelinaApi, YamlConfig } from "./api";
 import type { LoadedConfig, ResolvedConfig } from "./config";
 
 const MAX_LOG_ENTRIES = 5000;
@@ -57,7 +57,16 @@ export class Velina implements VelinaApi {
     this.#writeFiles(this.#config.files ?? []);
   }
 
-  getConfig(): LoadedConfig {
+  getConfig(): LoadedConfig;
+  getConfig(opts: { format: "yaml" }): YamlConfig;
+  getConfig(opts?: { format?: "yaml" }): LoadedConfig | YamlConfig {
+    if (opts?.format === "yaml") {
+      return {
+        provided: Bun.YAML.stringify(this.#loaded.provided, null, 2),
+        resolved: Bun.YAML.stringify(this.#loaded.resolved, null, 2),
+      };
+    }
+
     return this.#loaded;
   }
 
