@@ -1,5 +1,6 @@
-import { Badge, Box, Button, Flex, Grid, Heading, Table, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, Grid, Heading, HStack, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import { FiPlay, FiTerminal } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
 import type { LogType } from "../../../lib/api";
@@ -85,7 +86,10 @@ export function TasksPage() {
                     </Table.Cell>
                     <Table.Cell>
                       <Button size="xs" disabled={isRunning} onClick={() => void start(name)}>
-                        Start
+                        <HStack as="span" gap="1">
+                          <FiPlay aria-hidden="true" />
+                          Start
+                        </HStack>
                       </Button>
                     </Table.Cell>
                   </Table.Row>
@@ -109,7 +113,10 @@ export function TasksPage() {
                   disabled={Boolean(runningProcess)}
                   onClick={() => void start(selectedName)}
                 >
-                  Start
+                  <HStack as="span" gap="1">
+                    <FiPlay aria-hidden="true" />
+                    Start
+                  </HStack>
                 </Button>
               </Flex>
 
@@ -120,7 +127,8 @@ export function TasksPage() {
               <Text mb="4">Process ID: {runningProcess?.id ?? "none"}</Text>
               <Text mb="4">Files to write: {selectedTask.files.length}</Text>
 
-              <Heading size="sm" mt="4" mb="2">
+              <Heading size="sm" mt="4" mb="2" display="flex" alignItems="center" gap="2">
+                <FiTerminal aria-hidden="true" />
                 Logs
               </Heading>
               {runningProcess ? (

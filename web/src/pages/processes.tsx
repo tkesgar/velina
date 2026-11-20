@@ -1,5 +1,6 @@
-import { Badge, Box, Button, Flex, Grid, Heading, Table, Text } from "@chakra-ui/react";
+import { Badge, Box, Button, Flex, Grid, Heading, HStack, Table, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import { FiChevronRight, FiRefreshCw, FiTerminal, FiTrash2 } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
 import type { LogType, ProcessInfo } from "../../../lib/api";
@@ -85,7 +86,10 @@ export function ProcessesPage() {
                       size="sm"
                       onClick={() => setSearchParams({ process: process.id })}
                     >
-                      {process.id.slice(0, 8)}
+                      <HStack as="span" gap="1">
+                        <FiChevronRight aria-hidden="true" />
+                        {process.id.slice(0, 8)}
+                      </HStack>
                     </Button>
                   </Table.Cell>
                   <Table.Cell>{process.taskName}</Table.Cell>
@@ -109,7 +113,10 @@ export function ProcessesPage() {
                         }
                         onClick={() => void restart(process)}
                       >
-                        Restart
+                        <HStack as="span" gap="1">
+                          <FiRefreshCw aria-hidden="true" />
+                          Restart
+                        </HStack>
                       </Button>
                       <Button
                         size="xs"
@@ -118,7 +125,10 @@ export function ProcessesPage() {
                         disabled={process.state === "running"}
                         onClick={() => void run(() => api.deleteProcess(process.id))}
                       >
-                        Clean up
+                        <HStack as="span" gap="1">
+                          <FiTrash2 aria-hidden="true" />
+                          Clean up
+                        </HStack>
                       </Button>
                     </Flex>
                   </Table.Cell>
@@ -137,7 +147,8 @@ export function ProcessesPage() {
               </Heading>
               <ConfigView value={selected} />
 
-              <Heading size="sm" mt="4" mb="2">
+              <Heading size="sm" mt="4" mb="2" display="flex" alignItems="center" gap="2">
+                <FiTerminal aria-hidden="true" />
                 Logs
               </Heading>
               <LogViewer lines={lines} error={logError} type={logType} onTypeChange={setLogType} />
