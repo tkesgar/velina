@@ -1,5 +1,4 @@
 import { Badge, Box, Button, Flex, Heading, HStack, Text } from "@chakra-ui/react";
-import { useTheme } from "next-themes";
 import {
   FiActivity,
   FiList,
@@ -12,6 +11,7 @@ import {
 } from "react-icons/fi";
 import { NavLink, Outlet } from "react-router";
 
+import { useColorMode } from "../lib/color-mode";
 import { useVelina } from "../lib/velina-context";
 
 const navigation = [
@@ -22,8 +22,8 @@ const navigation = [
 
 export function AppShell() {
   const { connected } = useVelina();
-  const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
+  const { colorMode, toggleColorMode } = useColorMode();
+  const isDark = colorMode === "dark";
   const themeLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
 
   return (
@@ -61,7 +61,7 @@ export function AppShell() {
               variant="ghost"
               aria-label={themeLabel}
               title={themeLabel}
-              onClick={() => setTheme(isDark ? "light" : "dark")}
+              onClick={toggleColorMode}
             >
               {isDark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
             </Button>
