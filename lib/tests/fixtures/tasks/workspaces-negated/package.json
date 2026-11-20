@@ -1,0 +1,3 @@
+{
+  "workspaces": ["apps/*", "!apps/legacy"]
+}

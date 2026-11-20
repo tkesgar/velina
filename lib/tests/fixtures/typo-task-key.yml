@@ -1,0 +1,4 @@
+tasks:
+  build:
+    cmd: echo
+    cmdd: echo
