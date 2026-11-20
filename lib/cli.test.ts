@@ -4,12 +4,13 @@ import { parseArgs } from "./cli";
 
 describe("parseArgs", () => {
   it("should return no config path and no vars for an empty argv", () => {
-    expect(parseArgs([])).toEqual({ vars: {} });
+    expect(parseArgs([])).toEqual({ dev: false, vars: {} });
   });
 
   it("should read --config-path with a separate value", () => {
     expect(parseArgs(["--config-path", "config.yml"])).toEqual({
       configPath: "config.yml",
+      dev: false,
       vars: {},
     });
   });
@@ -17,32 +18,47 @@ describe("parseArgs", () => {
   it("should read --config-path with an inline value", () => {
     expect(parseArgs(["--config-path=config.yml"])).toEqual({
       configPath: "config.yml",
+      dev: false,
       vars: {},
     });
   });
 
   it("should read multiple --var entries", () => {
     expect(parseArgs(["--var", "A=1", "--var", "B=two"])).toEqual({
+      dev: false,
       vars: { A: "1", B: "two" },
     });
   });
 
   it("should read inline --var entries", () => {
-    expect(parseArgs(["--var=A=1"])).toEqual({ vars: { A: "1" } });
+    expect(parseArgs(["--var=A=1"])).toEqual({ dev: false, vars: { A: "1" } });
   });
 
   it("should preserve additional = characters in the value", () => {
-    expect(parseArgs(["--var", "TOKEN=a=b"])).toEqual({ vars: { TOKEN: "a=b" } });
+    expect(parseArgs(["--var", "TOKEN=a=b"])).toEqual({ dev: false, vars: { TOKEN: "a=b" } });
   });
 
   it("should let a later --var override an earlier value with the same name", () => {
-    expect(parseArgs(["--var", "A=1", "--var", "A=2"])).toEqual({ vars: { A: "2" } });
+    expect(parseArgs(["--var", "A=1", "--var", "A=2"])).toEqual({
+      dev: false,
+      vars: { A: "2" },
+    });
   });
 
   it("should read --config-path and --var together", () => {
     expect(parseArgs(["--config-path", "config.yml", "--var", "A=1"])).toEqual({
       configPath: "config.yml",
+      dev: false,
       vars: { A: "1" },
+    });
+  });
+
+  it("should read --dev", () => {
+    expect(parseArgs(["--dev"])).toEqual({ dev: true, vars: {} });
+    expect(parseArgs(["--dev", "--config-path", "config.yml"])).toEqual({
+      configPath: "config.yml",
+      dev: true,
+      vars: {},
     });
   });
 

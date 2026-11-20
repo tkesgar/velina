@@ -2,6 +2,7 @@ import { parseArgs as nodeParseArgs } from "node:util";
 
 export interface CliArgs {
   configPath?: string;
+  dev: boolean;
   vars: Record<string, string>;
 }
 
@@ -10,6 +11,7 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     args: argv,
     options: {
       "config-path": { type: "string" },
+      dev: { type: "boolean" },
       var: { type: "string", multiple: true },
     },
   });
@@ -28,5 +30,5 @@ export function parseArgs(argv: string[] = process.argv.slice(2)): CliArgs {
     vars[raw.slice(0, separator)] = raw.slice(separator + 1);
   }
 
-  return { configPath: values["config-path"], vars };
+  return { configPath: values["config-path"], dev: values.dev ?? false, vars };
 }

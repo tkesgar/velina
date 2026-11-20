@@ -6,7 +6,7 @@
     "velina-cli": "./velina-cli.ts"
   },
   "scripts": {
-    "dev": "bun --hot velina.ts",
+    "dev": "bun velina.ts --dev",
     "start": "bun velina.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
@@ -14,12 +14,22 @@
     "format:check": "oxfmt --check"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.38.0",
+    "@emotion/react": "^11.14.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
     "capnweb": "^0.12.0",
     "eta": "^4.6.0",
+    "next-themes": "^0.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router": "^8.5.2",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "oxfmt": "^0.79.0",
     "oxlint": "^1.94.0"
   }

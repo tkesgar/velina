@@ -6,6 +6,7 @@ import { parseArgs } from "./lib/cli";
 import { loadConfig } from "./lib/config";
 import { Velina } from "./lib/velina";
 import { VelinaRpcTarget } from "./lib/velina-rpc";
+import ui from "./web/index.html";
 
 // The API controls local processes and exposes their logs, so it is
 // intentionally unreachable from other hosts.
@@ -27,17 +28,25 @@ function isAllowedOrigin(req: Request): boolean {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const config = await loadConfig({
+const loaded = await loadConfig({
   configPath: args.configPath,
   overrideVars: args.vars,
 });
 
-const velina = new Velina(config);
+const velina = new Velina(loaded);
 const rpcHandler = newBunWebSocketRpcHandler(() => new VelinaRpcTarget(velina));
 
 export default {
+  routes: { "/ui/*": ui },
+  development: args.dev ? { hmr: true, console: true } : false,
   async fetch(req: Request, server: Bun.Server<undefined>) {
-    if (new URL(req.url).pathname !== API_PATH) {
+    const pathname = new URL(req.url).pathname;
+
+    if (pathname === "/ui") {
+      return Response.redirect(new URL("/ui/", req.url), 308);
+    }
+
+    if (pathname !== API_PATH) {
       return new Response("Not found", { status: 404 });
     }
 
@@ -52,6 +61,6 @@ export default {
     return newHttpBatchRpcResponse(req, new VelinaRpcTarget(velina));
   },
   websocket: rpcHandler,
-  port: config.port,
+  port: loaded.resolved.port,
   hostname: HOSTNAME,
 };

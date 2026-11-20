@@ -44,11 +44,14 @@ velina --config-path path/to/config.yml
 # These variables override variables defined in configuration file
 velina --var MY_VAR1=foo --var MY_VAR2=bar
 
+# Enable frontend hot reloading for UI development
+velina --dev
+
 # List the available tasks
 velina-cli tasks
 ```
 
-The server always binds to `127.0.0.1`, so `velina-cli` connects to the local instance; there is no remote mode.
+The server always binds to `127.0.0.1`, so `velina-cli` and the web UI connect to the local instance; there is no remote mode.
 
 ## Configuration
 
@@ -141,8 +144,18 @@ Within `env` entries, `env` refers to the inherited environment; within files, i
 - Each entry in the root `scripts` becomes a task named after the script. It runs `<packageManager> run <script>` with `cwd` set to `rootDir`.
 - If `package.json` has a `workspaces` array, each matching workspace `package.json` is read. Its scripts become tasks prefixed with the workspace's relative directory, for example `apps/frontend:dev`, with `cwd` set to that directory.
 - Workspace patterns beginning with `!` exclude matching packages. Only the array form of `workspaces` is supported.
-- Scanned tasks have empty `env` and `files`.
+- Scanned tasks inherit the resolved root `env` (including `PATH` when `inheritEnv` is true) and have empty `files`.
 - Tasks defined in the config override scanned tasks of the same name; a `null` entry removes one.
+
+## Web UI
+
+The web UI is served at `/ui/` on the server's port, for example `http://127.0.0.1:2222/ui/`. It redirects to `/ui/tasks`.
+
+- `/ui/tasks` lists all available tasks, shows whether one has a running process, and lets you start a task and view its logs.
+- `/ui/processes` lists running and stopped processes, shows details and logs, and lets you restart or clean them up.
+- `/ui/config` shows both the provided and fully resolved configuration.
+
+The UI is built by Bun directly from `web/index.html`; there is no separate frontend build or dev server. Run `velina --dev` to enable hot reloading while working on it. The header has a light/dark switcher whose choice is stored in local storage.
 
 ## API
 
@@ -154,7 +167,7 @@ import type { VelinaApi } from "./lib/api";
 
 using api = newWebSocketRpcSession<VelinaApi>("ws://127.0.0.1:2222/api");
 
-const config = await api.getConfig();
+const { provided, resolved } = await api.getConfig();
 const process = await api.startTask("backend:dev");
 
 for await (const entry of await api.streamProcessLogs(process.id, "stdout")) {
@@ -167,7 +180,7 @@ api.deleteProcess(process.id);
 
 | Function                      | Description                                                                                                                   |
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `getConfig()`                 | Fully resolved config, including all available tasks.                                                                         |
+| `getConfig()`                 | `{ provided, resolved }`: the parsed config and the fully resolved config, including all available tasks.                     |
 | `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                 |
 | `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                   |
 | `getProcess(id)`              | Details for one process.                                                                                                      |

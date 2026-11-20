@@ -111,11 +111,12 @@ afterAll(async () => {
 });
 
 describe("Velina RPC", () => {
-  it("should return the resolved config over WebSocket", async () => {
+  it("should return the provided and resolved config over WebSocket", async () => {
     const config = await api.getConfig();
 
-    expect(config.port).toBe(port);
-    expect(Object.keys(config.tasks)).toContain("greet");
+    expect(config.provided).toEqual({ port, tasks: expect.any(Object) });
+    expect(config.resolved.port).toBe(port);
+    expect(Object.keys(config.resolved.tasks)).toContain("greet");
   });
 
   it("should start a task, stream its logs, then stop and delete it", async () => {
@@ -157,6 +158,6 @@ describe("Velina RPC", () => {
     const batch = newHttpBatchRpcSession<VelinaApi>(`http://127.0.0.1:${port}/api`);
 
     const config = await batch.getConfig();
-    expect(config.port).toBe(port);
+    expect(config.resolved.port).toBe(port);
   });
 });

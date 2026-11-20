@@ -1,4 +1,4 @@
-import type { ResolvedConfig } from "./config";
+import type { LoadedConfig } from "./config";
 
 export type LogType = "stdout" | "stderr";
 
@@ -25,7 +25,7 @@ export interface ProcessInfo {
 // Shared between the server target and the CLI client. Cap'n Web needs no
 // generated interface: this is the API description.
 export interface VelinaApi {
-  getConfig(): ResolvedConfig;
+  getConfig(): LoadedConfig;
   startTask(name: string): ProcessInfo;
   getAllProcesses(): ProcessInfo[];
   getProcess(id: string): ProcessInfo;

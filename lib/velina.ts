@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import type { Subprocess } from "bun";
 
 import type { LogEntry, LogType, ProcessInfo, VelinaApi } from "./api";
-import type { ResolvedConfig } from "./config";
+import type { LoadedConfig, ResolvedConfig } from "./config";
 
 const MAX_LOG_ENTRIES = 5000;
 const STOP_TIMEOUT_MS = 5000;
@@ -47,16 +47,18 @@ function flushSubscriber(subscriber: LogSubscriber): void {
 }
 
 export class Velina implements VelinaApi {
+  readonly #loaded: LoadedConfig;
   readonly #config: ResolvedConfig;
   readonly #processes = new Map<string, ManagedProcess>();
 
-  constructor(config: ResolvedConfig) {
-    this.#config = config;
-    this.#writeFiles(config.files ?? []);
+  constructor(loaded: LoadedConfig) {
+    this.#loaded = loaded;
+    this.#config = loaded.resolved;
+    this.#writeFiles(this.#config.files ?? []);
   }
 
-  getConfig(): ResolvedConfig {
-    return this.#config;
+  getConfig(): LoadedConfig {
+    return this.#loaded;
   }
 
   startTask(name: string): ProcessInfo {

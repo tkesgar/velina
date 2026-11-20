@@ -2,7 +2,7 @@ import { RpcTarget } from "capnweb";
 import * as z from "zod";
 
 import type { LogEntry, LogType, ProcessInfo, VelinaApi } from "./api";
-import type { ResolvedConfig } from "./config";
+import type { LoadedConfig } from "./config";
 import type { Velina } from "./velina";
 
 // Cap'n Web performs no runtime type checks. Validate the boundary values
@@ -18,7 +18,7 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
     this.#velina = velina;
   }
 
-  getConfig(): ResolvedConfig {
+  getConfig(): LoadedConfig {
     return this.#velina.getConfig();
   }
 

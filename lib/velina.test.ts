@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 
 import type { LogEntry, ProcessState } from "./api";
-import type { ResolvedConfig } from "./config";
+import type { LoadedConfig, ResolvedConfig } from "./config";
 import { Velina } from "./velina";
 
 const instances: Velina[] = [];
 const tempDirs: string[] = [];
 
-function createVelina(config: ResolvedConfig): Velina {
+function createVelina(config: LoadedConfig): Velina {
   const velina = new Velina(config);
   instances.push(velina);
   return velina;
@@ -19,8 +19,11 @@ function createVelina(config: ResolvedConfig): Velina {
 function configWith(
   tasks: ResolvedConfig["tasks"],
   files: ResolvedConfig["files"] = [],
-): ResolvedConfig {
-  return { port: 2222, vars: {}, env: {}, files, tasks };
+): LoadedConfig {
+  return {
+    provided: {},
+    resolved: { port: 2222, vars: {}, env: {}, files, tasks },
+  };
 }
 
 function evalTask(source: string): NonNullable<ResolvedConfig["tasks"]>[string] {
@@ -68,11 +71,12 @@ afterEach(async () => {
 
 describe("Velina", () => {
   describe("getConfig", () => {
-    it("should return the resolved config", () => {
+    it("should return the provided and resolved config", () => {
       const config = configWith({});
       const velina = createVelina(config);
 
       expect(velina.getConfig()).toBe(config);
+      expect(velina.getConfig().provided).toEqual({});
     });
   });
 

@@ -27,7 +27,8 @@ const zResolvableObject = z.union([
 // resolveValue normalizes them at read time.
 const zConfigResolvable = z.unknown();
 
-const zConfigFileEntry = z.object({
+const zConfigFileEntry = z
+  .object({
     path: z.string(),
     content: zConfigResolvable,
   })
@@ -46,7 +47,8 @@ const zConfig = z
     files: z.array(zConfigFileEntry),
     tasks: z.record(
       z.string(),
-      z.object({
+      z
+        .object({
           cmd: z.string(),
           args: z.array(z.string()).optional(),
           cwd: z.string().optional(),
@@ -209,8 +211,9 @@ export function resolveFiles(
 async function scanTasks(ctx: {
   rootDir: string;
   packageManager: string;
+  env: Record<string, string>;
 }): Promise<ResolvedConfig["tasks"]> {
-  const { rootDir, packageManager } = ctx;
+  const { rootDir, packageManager, env } = ctx;
   const tasks: ResolvedConfig["tasks"] = {};
 
   const manifestFile = Bun.file(path.join(rootDir, "package.json"));
@@ -230,7 +233,7 @@ async function scanTasks(ctx: {
         cmd: packageManager,
         args: ["run", name],
         cwd,
-        env: {},
+        env: { ...env },
         files: [],
       };
     }
@@ -327,6 +330,7 @@ export async function resolveConfig(
     ...(await scanTasks({
       rootDir,
       packageManager: config.packageManager ?? DEFAULT_PACKAGE_MANAGER,
+      env,
     })),
   };
 
@@ -353,15 +357,21 @@ export async function resolveConfig(
   };
 }
 
+export interface LoadedConfig {
+  provided: Config;
+  resolved: ResolvedConfig;
+}
+
 export async function loadConfig(
   opts: {
     configPath?: string;
     overrideVars?: Record<string, string>;
     cwd?: string;
   } = {},
-): Promise<ResolvedConfig> {
+): Promise<LoadedConfig> {
   const { configPath, overrideVars, cwd } = opts;
 
-  const config = await readConfig({ configPath, cwd });
-  return resolveConfig(config, { overrideVars });
+  const provided = await readConfig({ configPath, cwd });
+  const resolved = await resolveConfig(provided, { overrideVars });
+  return { provided, resolved };
 }

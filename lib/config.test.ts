@@ -365,7 +365,7 @@ describe("config", () => {
 
       it("should add root scripts as tasks", async () => {
         const rootDir = path.join(tasksFixtures, "root-scripts");
-        const resolved = await resolveConfig({ rootDir });
+        const resolved = await resolveConfig({ rootDir, inheritEnv: false });
 
         expect(resolved.tasks).toEqual({
           dev: task(rootDir, "dev"),
@@ -375,14 +375,14 @@ describe("config", () => {
 
       it("should use the configured packageManager", async () => {
         const rootDir = path.join(tasksFixtures, "custom-pm");
-        const resolved = await resolveConfig({ rootDir, packageManager: "npm" });
+        const resolved = await resolveConfig({ rootDir, packageManager: "npm", inheritEnv: false });
 
         expect(resolved.tasks.test).toEqual(task(rootDir, "test", "npm"));
       });
 
       it("should add workspace scripts with the relative directory as prefix", async () => {
         const rootDir = path.join(tasksFixtures, "workspaces");
-        const resolved = await resolveConfig({ rootDir });
+        const resolved = await resolveConfig({ rootDir, inheritEnv: false });
 
         expect(resolved.tasks).toEqual({
           "apps/frontend:dev": task(path.join(rootDir, "apps/frontend"), "dev"),
@@ -393,7 +393,7 @@ describe("config", () => {
 
       it("should exclude workspaces matched by a negated pattern", async () => {
         const rootDir = path.join(tasksFixtures, "workspaces-negated");
-        const resolved = await resolveConfig({ rootDir });
+        const resolved = await resolveConfig({ rootDir, inheritEnv: false });
 
         expect(resolved.tasks).toEqual({
           "apps/frontend:dev": task(path.join(rootDir, "apps/frontend"), "dev"),
@@ -402,21 +402,29 @@ describe("config", () => {
 
       it("should ignore a workspaces object", async () => {
         const rootDir = path.join(tasksFixtures, "workspace-object");
-        const resolved = await resolveConfig({ rootDir });
+        const resolved = await resolveConfig({ rootDir, inheritEnv: false });
 
         expect(resolved.tasks).toEqual({});
       });
 
-      it("should not copy env into scanned tasks", async () => {
-        process.env.VELINA_TEST_TASK_ENV = "leak";
+      it("should inherit the resolved env in scanned tasks", async () => {
+        process.env.VELINA_TEST_TASK_ENV = "inherited";
         try {
           const rootDir = path.join(tasksFixtures, "root-scripts");
           const resolved = await resolveConfig({ rootDir });
 
-          expect(resolved.tasks.dev.env).toEqual({});
+          expect(resolved.tasks.dev.env.VELINA_TEST_TASK_ENV).toBe("inherited");
+          expect(resolved.tasks.dev.env.PATH).toBeTruthy();
         } finally {
           delete process.env.VELINA_TEST_TASK_ENV;
         }
+      });
+
+      it("should not inherit env in scanned tasks when inheritEnv is false", async () => {
+        const rootDir = path.join(tasksFixtures, "root-scripts");
+        const resolved = await resolveConfig({ rootDir, inheritEnv: false });
+
+        expect(resolved.tasks.dev.env).toEqual({});
       });
 
       it("should let config tasks override scanned tasks and null remove them", async () => {
@@ -474,32 +482,36 @@ describe("config", () => {
 
   describe("loadConfig", () => {
     it("should read and resolve the default config", async () => {
-      const resolved = await loadConfig({ cwd: path.join(fixturesDir, "default") });
+      const loaded = await loadConfig({ cwd: path.join(fixturesDir, "default") });
 
-      expect(resolved.port).toBe(1234);
+      expect(loaded.provided).toEqual({ port: 1234 });
+      expect(loaded.resolved.port).toBe(1234);
     });
 
     it("should read and resolve the provided config path", async () => {
-      const resolved = await loadConfig({ configPath: path.join(fixturesDir, "vars.yml") });
+      const loaded = await loadConfig({ configPath: path.join(fixturesDir, "vars.yml") });
 
-      expect(resolved.vars).toEqual({ GREETING: "hello" });
+      expect(loaded.provided).toEqual({ vars: { GREETING: "hello" } });
+      expect(loaded.resolved.vars).toEqual({ GREETING: "hello" });
     });
 
     it("should apply override vars on top of the config vars", async () => {
-      const resolved = await loadConfig({
+      const loaded = await loadConfig({
         configPath: path.join(fixturesDir, "vars.yml"),
         overrideVars: { GREETING: "howdy", NAME: "Vivian" },
       });
 
-      expect(resolved.vars).toEqual({ GREETING: "howdy", NAME: "Vivian" });
+      expect(loaded.provided).toEqual({ vars: { GREETING: "hello" } });
+      expect(loaded.resolved.vars).toEqual({ GREETING: "howdy", NAME: "Vivian" });
     });
 
     it("should use defaults when the config file does not exist at the default path", async () => {
-      const resolved = await loadConfig({ cwd: path.join(fixturesDir, "empty") });
+      const loaded = await loadConfig({ cwd: path.join(fixturesDir, "empty") });
 
-      expect(resolved.port).toBe(DEFAULT_PORT);
-      expect(resolved.vars).toEqual({});
-      expect(resolved.files).toEqual([]);
+      expect(loaded.provided).toEqual({});
+      expect(loaded.resolved.port).toBe(DEFAULT_PORT);
+      expect(loaded.resolved.vars).toEqual({});
+      expect(loaded.resolved.files).toEqual([]);
     });
   });
 });
