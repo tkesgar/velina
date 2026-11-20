@@ -38,7 +38,6 @@ const zConfigEnv = z.record(z.string(), zConfigResolvable);
 const zConfig = z
   .object({
     port: z.number().int().min(1).max(65535),
-    host: z.hostname(),
     inheritEnv: z.boolean(),
     rootDir: z.string(),
     packageManager: z.string(),
@@ -66,8 +65,6 @@ export type Config = z.infer<typeof zConfig>;
 export const DEFAULT_CONFIG_PATH = ".velina.yml";
 
 export const DEFAULT_PORT = 2222;
-
-export const DEFAULT_HOST = "127.0.0.1";
 
 export const DEFAULT_PACKAGE_MANAGER = "bun";
 
@@ -279,7 +276,6 @@ async function scanTasks(ctx: {
 
 export interface ResolvedConfig {
   port: number;
-  host: string;
   vars: Record<string, unknown>;
   env: Record<string, string>;
   files: Array<{
@@ -312,7 +308,6 @@ export async function resolveConfig(
   const rootDir = path.resolve(config.rootDir ?? ".");
 
   const port = config.port ?? DEFAULT_PORT;
-  const host = config.host ?? DEFAULT_HOST;
   const vars = resolveVars({ overrideVars }, config.vars ?? {});
 
   const parentEnv =
@@ -351,7 +346,6 @@ export async function resolveConfig(
 
   return {
     port,
-    host,
     vars,
     env,
     files,

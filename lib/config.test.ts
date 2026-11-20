@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 
 import {
-  DEFAULT_HOST,
   DEFAULT_PACKAGE_MANAGER,
   DEFAULT_PORT,
   loadConfig,
@@ -21,7 +20,6 @@ describe("config", () => {
       it("should read config from default path", async () => {
         expect(readConfig({ cwd: path.join(fixturesDir, "default") })).resolves.toEqual({
           port: 1234,
-          host: "192.168.0.1",
         });
       });
 
@@ -229,16 +227,14 @@ describe("config", () => {
       const resolved = await resolveConfig({});
 
       expect(resolved.port).toBe(DEFAULT_PORT);
-      expect(resolved.host).toBe(DEFAULT_HOST);
       expect(resolved.vars).toEqual({});
       expect(resolved.files).toEqual([]);
     });
 
-    it("should use the provided port and host", async () => {
-      const resolved = await resolveConfig({ port: 1234, host: "192.168.0.1" });
+    it("should use the provided port", async () => {
+      const resolved = await resolveConfig({ port: 1234 });
 
       expect(resolved.port).toBe(1234);
-      expect(resolved.host).toBe("192.168.0.1");
     });
 
     it("should resolve vars", async () => {
@@ -481,7 +477,6 @@ describe("config", () => {
       const resolved = await loadConfig({ cwd: path.join(fixturesDir, "default") });
 
       expect(resolved.port).toBe(1234);
-      expect(resolved.host).toBe("192.168.0.1");
     });
 
     it("should read and resolve the provided config path", async () => {

@@ -46,12 +46,9 @@ velina --var MY_VAR1=foo --var MY_VAR2=bar
 
 # List the available tasks
 velina-cli tasks
-
-# Run against custom server location
-velina-cli --server 8080 tasks
-velina-cli --server http://192.168.0.200:2222 tasks
-velina-cli --server https://homelab.tail1234.ts/velina tasks
 ```
+
+The server always binds to `127.0.0.1`, so `velina-cli` connects to the local instance; there is no remote mode.
 
 ## Configuration
 
@@ -60,9 +57,6 @@ velina-cli --server https://homelab.tail1234.ts/velina tasks
 # Must be an integer between 1 and 65535.
 # Default: 2222
 port: 2222
-# Specifies the host velina-server runs at.
-# Default: 127.0.0.1 (localhost)
-host: 127.0.0.1
 # Inherit environment variables from the velina process.
 # Default: true
 inheritEnv: true
@@ -152,54 +146,38 @@ Within `env` entries, `env` refers to the inherited environment; within files, i
 
 ## API
 
-The `/api` path exposes a Cap'n Web RPC target with the following functions:
+The `/api` path exposes a Cap'n Web RPC target. HTTP batch handles one-shot calls; WebSocket is required for log streaming. The server always binds to `127.0.0.1`.
 
 ```ts
-import { RpcTarget } from "capnweb";
+import { newWebSocketRpcSession } from "capnweb";
+import type { VelinaApi } from "./lib/api";
 
-interface VelinaResolvedConfig {
-  port: number;
-  host: string;
-  var: Record<string, unknown>;
-  env: Record<string, string>;
-  files: VelinaConfigFileEntry[];
-  repositoryDir: string;
-  tasks: Record<string, VelinaConfigTaskEntry>;
+using api = newWebSocketRpcSession<VelinaApi>("ws://127.0.0.1:2222/api");
+
+const config = await api.getConfig();
+const process = await api.startTask("backend:dev");
+
+for await (const entry of await api.streamProcessLogs(process.id, "stdout")) {
+  console.log(entry.line);
 }
 
-interface VelinaConfigFileEntry {
-  path: string;
-  content: string;
-}
-
-interface VelinaConfigTaskEntry {
-  cmd: string;
-  cwd: string;
-  env: Record<string, string>;
-  files: VelinaConfigFileEntry[];
-}
-
-interface VelinaTaskRun {
-  id: string;
-  task: {
-    cmd: string;
-    cwd: string;
-    env: Record<string, string>;
-  };
-}
-
-abstract class VelinaRPC extends RpcTarget {
-  abstract getResolvedConfig(): VelinaResolvedConfig;
-
-  abstract runTask(name: string): Promise<VelinaTaskRun>;
-
-  abstract getAllTaskRuns(): VelinaTaskRun[];
-
-  abstract getTaskRun(id: string): VelinaTaskRun;
-
-  abstract streamTaskRun(id: string, type?: "stdout" | "stderr" | "both"): ReadableStream;
-}
+await api.stopProcess(process.id);
+api.deleteProcess(process.id);
 ```
+
+| Function                      | Description                                                                                                                   |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `getConfig()`                 | Fully resolved config, including all available tasks.                                                                         |
+| `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                 |
+| `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                   |
+| `getProcess(id)`              | Details for one process.                                                                                                      |
+| `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops. |
+| `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.        |
+| `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                |
+
+A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, and `cwd`. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
+
+The API runs local commands without authentication. Browser WebSocket connections from other origins are rejected, but do not expose the port through a proxy or tunnel.
 
 ## CLI
 
