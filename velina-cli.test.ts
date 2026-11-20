@@ -1,0 +1,178 @@
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
+import type { Subprocess } from "bun";
+
+import type { ProcessInfo } from "./lib/api";
+
+const projectRoot = import.meta.dir;
+
+let tempDir: string;
+let port: number;
+let server: Subprocess | undefined;
+let serverLog = "";
+
+function findFreePort(): number {
+  const probe = Bun.serve({ port: 0, fetch: () => new Response() });
+  const freePort = probe.port;
+  probe.stop(true);
+
+  if (!freePort) throw new Error("Could not find a free port");
+  return freePort;
+}
+
+function cli(...args: string[]) {
+  const result = Bun.spawnSync({
+    cmd: [
+      process.execPath,
+      path.join(projectRoot, "velina-cli.ts"),
+      ...args,
+      "--port",
+      String(port),
+    ],
+    cwd: projectRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
+}
+
+async function waitForServer(): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/`);
+      if (response.status === 404) return;
+    } catch {
+      // Not listening yet.
+    }
+
+    await Bun.sleep(20);
+  }
+
+  throw new Error(`Server did not start: ${serverLog}`);
+}
+
+beforeAll(async () => {
+  tempDir = mkdtempSync(path.join(tmpdir(), "velina-cli-test-"));
+  port = findFreePort();
+
+  writeFileSync(
+    path.join(tempDir, "velina.json"),
+    JSON.stringify({
+      port,
+      tasks: {
+        greet: {
+          cmd: process.execPath,
+          args: ["-e", "console.log('cli hello'); setInterval(() => {}, 50)"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
+      },
+    }),
+  );
+
+  server = Bun.spawn({
+    cmd: [
+      process.execPath,
+      path.join(projectRoot, "velina.ts"),
+      "--config-path",
+      path.join(tempDir, "velina.json"),
+    ],
+    cwd: projectRoot,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+
+  const stderr = server?.stderr;
+  if (stderr && typeof stderr !== "number") {
+    void (async () => {
+      const reader = stderr.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        serverLog += decoder.decode(value, { stream: true });
+      }
+    })();
+  }
+
+  await waitForServer();
+});
+
+afterAll(async () => {
+  server?.kill();
+  await server?.exited.catch(() => {});
+  rmSync(tempDir, { recursive: true, force: true });
+});
+
+describe("velina-cli", () => {
+  it("should print usage for --help", () => {
+    const result = cli("--help");
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Usage:");
+  });
+
+  it("should return the config as JSON", () => {
+    const result = cli("config");
+
+    expect(result.exitCode).toBe(0);
+    const config = JSON.parse(result.stdout);
+    expect(config.resolved.port).toBe(port);
+  });
+
+  it("should return the config as YAML", () => {
+    const result = cli("config", "--format", "yaml");
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain(`port: ${port}`);
+  });
+
+  it("should manage a process through its full lifecycle", () => {
+    const started = cli("start", "greet");
+    expect(started.exitCode).toBe(0);
+
+    const process = JSON.parse(started.stdout) as ProcessInfo;
+    expect(process.state).toBe("running");
+
+    const all = cli("ps");
+    expect(all.exitCode).toBe(0);
+    expect((JSON.parse(all.stdout) as ProcessInfo[]).map((p) => p.id)).toContain(process.id);
+
+    const detail = cli("process", process.id.slice(0, 8));
+    expect(detail.exitCode).toBe(0);
+    expect((JSON.parse(detail.stdout) as ProcessInfo).id).toBe(process.id);
+
+    const stopped = cli("stop", process.id.slice(0, 8));
+    expect(stopped.exitCode).toBe(0);
+    expect((JSON.parse(stopped.stdout) as ProcessInfo).state).toBe("stopped");
+
+    const logs = cli("logs", process.id.slice(0, 8), "stdout", "--json");
+    expect(logs.exitCode).toBe(0);
+    expect(logs.stdout).toContain("cli hello");
+    expect(JSON.parse(logs.stdout.trim().split("\n")[0]).line).toBe("cli hello");
+
+    const deleted = cli("delete", process.id.slice(0, 8));
+    expect(deleted.exitCode).toBe(0);
+    expect(JSON.parse(deleted.stdout)).toEqual({ deleted: process.id });
+
+    const remaining = cli("ps");
+    expect((JSON.parse(remaining.stdout) as ProcessInfo[]).map((p) => p.id)).not.toContain(
+      process.id,
+    );
+  });
+
+  it("should exit with code 2 on a usage error", () => {
+    const result = cli("unknown");
+
+    expect(result.exitCode).toBe(2);
+    expect(result.stderr).toContain("Unknown command");
+  });
+});

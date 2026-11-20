@@ -44,9 +44,6 @@ velina --config-path path/to/config.yml
 # These variables override variables defined in configuration file
 velina --var MY_VAR1=foo --var MY_VAR2=bar
 
-# Enable frontend hot reloading while developing Velina's own UI
-velina --dev
-
 # Scaffold .velina.yml and package.json scripts in a repository
 velina init
 velina init path/to/repo --agent-doc --json
@@ -55,8 +52,8 @@ velina init path/to/repo --agent-doc --json
 velina config check
 velina schema
 
-# List the available tasks
-velina-cli tasks
+# List processes through the CLI
+velina-cli ps
 ```
 
 Run `velina --help` for the full command list. The server always binds to `127.0.0.1`, so `velina-cli` and the web UI connect to the local instance; there is no remote mode.
@@ -220,16 +217,17 @@ The API runs local commands without authentication. Browser WebSocket connection
 
 ## CLI
 
+`velina-cli` is a thin client for the API. Every command prints JSON, except `logs`, which prints timestamped lines by default.
+
 ```
-velina-cli config
-
-velina-cli run
-
-velina-cli run-info
-
-velina-cli log
-
-velina-cli log --stdout
-
-velina-cli log --stderr
+velina-cli config                       provided and resolved config
+velina-cli config --format yaml         resolved config as YAML
+velina-cli start <task>                 start a task
+velina-cli ps                           list all processes
+velina-cli process <id>                 show process details
+velina-cli logs <id> [stdout|stderr]    stream logs (default stdout)
+velina-cli stop <id>                    stop a process
+velina-cli delete <id>                  delete a stopped process
 ```
+
+Global options: `--port <port>` overrides the port from `.velina.yml`, `--json` makes `logs` emit one JSON object per line, and `--help` prints usage. Process ids may be abbreviated to any unique prefix. Errors are printed to stderr with exit code `1` for API failures and `2` for usage errors.
