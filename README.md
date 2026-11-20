@@ -44,14 +44,39 @@ velina --config-path path/to/config.yml
 # These variables override variables defined in configuration file
 velina --var MY_VAR1=foo --var MY_VAR2=bar
 
-# Enable frontend hot reloading for UI development
+# Enable frontend hot reloading while developing Velina's own UI
 velina --dev
+
+# Scaffold .velina.yml and package.json scripts in a repository
+velina init
+velina init path/to/repo --agent-doc --json
+
+# Validate a config, or print the config JSON Schema
+velina config check
+velina schema
 
 # List the available tasks
 velina-cli tasks
 ```
 
-The server always binds to `127.0.0.1`, so `velina-cli` and the web UI connect to the local instance; there is no remote mode.
+Run `velina --help` for the full command list. The server always binds to `127.0.0.1`, so `velina-cli` and the web UI connect to the local instance; there is no remote mode.
+
+## Agent setup
+
+Velina is designed for a global install, so a repository needs no local dependency. To set it up in another project:
+
+```
+cd ~/path/to/project
+velina init --yes --agent-doc
+velina config check
+velina
+```
+
+`velina init` writes a commented `.velina.yml` if one does not exist and adds a `velina` script to `package.json` if it exists. It never overwrites existing config keys or scripts. `--dev` is only useful when developing Velina's own UI; consumer projects do not need it.
+
+With `--agent-doc`, it also appends a short Velina pointer to `AGENTS.md` — but only if that file already exists. The pointer is idempotent: running `init` again replaces the marked section instead of duplicating it. Existing `AGENTS.md` content is otherwise preserved.
+
+Use `--json` for a machine-readable result with the created config path, added scripts, and whether the agent pointer was added, updated, or skipped. Agents can use `velina schema` to see the accepted config fields and `velina config check` to validate before starting the server.
 
 ## Configuration
 

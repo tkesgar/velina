@@ -36,7 +36,7 @@ const zConfigFileEntry = z
 
 const zConfigEnv = z.record(z.string(), zConfigResolvable);
 
-const zConfig = z
+export const zConfig = z
   .object({
     port: z.number().int().min(1).max(65535),
     inheritEnv: z.boolean(),

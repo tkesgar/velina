@@ -3,6 +3,7 @@
 import { newBunWebSocketRpcHandler, newHttpBatchRpcResponse } from "capnweb";
 
 import { parseArgs } from "./lib/cli";
+import { handleCommand } from "./lib/commands";
 import { loadConfig } from "./lib/config";
 import { Velina } from "./lib/velina";
 import { VelinaRpcTarget } from "./lib/velina-rpc";
@@ -25,6 +26,11 @@ function isAllowedOrigin(req: Request): boolean {
   } catch {
     return false;
   }
+}
+
+const commandExit = await handleCommand(process.argv.slice(2));
+if (commandExit !== undefined) {
+  process.exit(commandExit);
 }
 
 const args = parseArgs(process.argv.slice(2));
