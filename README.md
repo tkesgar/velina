@@ -5,13 +5,16 @@ velina is a lightweight task runner built on top of Bun. I personally use it to 
 ```yaml
 tasks:
   backend:dev:
-    cmd: bun run dev
+    cmd: bun
+    args: [run, dev]
     cwd: ./apps/backend
   frontend:dev:
-    cmd: bunx nuxi dev
+    cmd: bunx
+    args: [nuxi, dev]
     cwd: ./apps/frontend
   mock-oauth:start:
-    cmd: bunx start
+    cmd: bunx
+    args: [start]
     cwd: ./apps/mock-oauth-service
 ```
 
@@ -54,81 +57,98 @@ velina-cli --server https://homelab.tail1234.ts/velina tasks
 
 ```yaml
 # Specifies the port velina-server runs at.
+# Must be an integer between 1 and 65535.
 # Default: 2222
 port: 2222
 # Specifies the host velina-server runs at.
 # Default: 127.0.0.1 (localhost)
 host: 127.0.0.1
-# Specify variables that will be available in templates.
-var:
+# Inherit environment variables from the velina process.
+# Default: true
+inheritEnv: true
+# Root directory for file paths, task cwd, and task scanning.
+# Resolved against the current working directory.
+# Default: current working directory
+rootDir: .
+# Package manager used for scanned tasks (for example bun, npm, pnpm).
+# Default: bun
+packageManager: bun
+# Variables made available to templates.
+vars:
   VAR1: foo
   VAR2: bar
-# Specify environment variables that will be added to all subprocesses.
-# Templates are supported.
+  # Variables may also use the resolvable forms described below.
+  GENERATED:
+    type: cmd
+    cmd: date
+# Environment variables added to all subprocesses.
+# A null value removes the variable from the inherited environment.
 env:
   ENV1: foo
-  ENV2: <%= it.var.VAR1 %>
-  # Prevent velina environment variables from being added.
+  ENV2: <%= vars.VAR1 %>
   SHELL: null
-# Specifies files to be written.
-# These files are written once when velina is started.
+# Files written when velina starts. Paths are resolved against rootDir.
 files:
-  # If content type is string: run the template and write it to the path.
+  # A plain string is rendered as a template.
   - path: ./foo
+    content: Hello <%= vars.VAR2 %>!
+  # Explicit resolvable forms.
+  - path: ./bar
     content:
-      type: string
-      value: Hello <%= it.var.VAR2 %>!
-  # If content type is cmd: run the command and print its stdout to the path.
+      type: text
+      text: Hello <%= vars.VAR2 %>!
   - path: ./dev.key
     content:
       type: cmd
-      cmd: openssl genpkey -algorithm ed25519
-  # Shorthands for the forms above
-  - path: ./foo
-    content: >-
-      Hello <%= it.var.VAR2 %>!
-  - path: ./foo
-    cmd: openssl genpkey -algorithm ed25519
-# Path to root directory to scan for tasks.
-# Set to null to disable scanning for tasks.
-# Default: current working directory
-rootDir: .
-# Provide the list of tasks.
-# Note that tasks with the same name defined here overrides scanned tasks.
+      cmd: openssl
+      args: [genpkey, -algorithm, ed25519]
+  # Other values are used as-is and stringified when written.
+  - path: ./count
+    content: 42
+# Tasks override scanned tasks with the same name.
+# A null entry removes a scanned task.
 tasks:
-  # Prevent a scanned tasks from being added into the task list.
   norma:lint: null
   norma:start:
-    # Specify the command to run.
-    cmd: npm start
-    # Specify the cwd for the command.
+    cmd: npm
+    args: [start]
+    # Resolved against rootDir.
     cwd: ./apps/norma
-    # Specify addtional/override environment variables for the command.
     env:
       NODE_ENV: development
-      # Prevent root/velina environment variables from being added.
-      NODE_ENV: null
-    # Specify files to be written.
-    # These files are written before the task is run.
+    # Written before the task is run.
     files:
       - path: ./foo
-        content: >-
-          Hello <%= it.var.VAR2 %>!
-      - path: ./dev.key
-        cmd: openssl genpkey -algorithm ed25519
+        content: Hello <%= vars.VAR2 %>!
 ```
+
+Unknown keys are rejected. A missing `.velina.yml` or an empty one is treated as an empty configuration; an explicitly provided config path that does not exist is an error.
+
+### Resolvable values
+
+Values in `vars`, `env`, and file `content` accept three forms:
+
+- `value`: used as-is.
+- `text`: rendered as an Eta template.
+- `cmd`: runs `cmd` with `args` and uses its trimmed standard output.
+
+A plain string is shorthand for `text`; any other plain value is shorthand for `value`. Variables cannot reference other variables or environment variables.
 
 ### Values available in templates
 
-- `it.var`: variables (example: `it.var.VAR1`)
-- `it.env`: environment variables (example: `it.env.NODE_ENV`)
+- `vars`: variables (example: `<%= vars.VAR1 %>`)
+- `env`: environment variables (example: `<%= env.NODE_ENV %>`)
+
+Within `env` entries, `env` refers to the inherited environment; within files, it refers to the fully resolved environment.
 
 ### Task scanning
 
-- Read `<repositoryDir>/package.json` if exists.
-- Add all `scripts` entries as tasks, with the `cwd` set to `<repositoryDir>`
-- Look for `workspaces` entries, and read the subpackage `package.json` entries.
-- Add all `scripts` entries as tasks with dirname as prefix.
+- If `rootDir` does not contain a `package.json`, no tasks are scanned.
+- Each entry in the root `scripts` becomes a task named after the script. It runs `<packageManager> run <script>` with `cwd` set to `rootDir`.
+- If `package.json` has a `workspaces` array, each matching workspace `package.json` is read. Its scripts become tasks prefixed with the workspace's relative directory, for example `apps/frontend:dev`, with `cwd` set to that directory.
+- Workspace patterns beginning with `!` exclude matching packages. Only the array form of `workspaces` is supported.
+- Scanned tasks have empty `env` and `files`.
+- Tasks defined in the config override scanned tasks of the same name; a `null` entry removes one.
 
 ## API
 

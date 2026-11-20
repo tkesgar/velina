@@ -5,6 +5,7 @@ import {
   DEFAULT_HOST,
   DEFAULT_PACKAGE_MANAGER,
   DEFAULT_PORT,
+  loadConfig,
   readConfig,
   resolveConfig,
   resolveEnv,
@@ -472,6 +473,38 @@ describe("config", () => {
           { path: path.join(rootDir, "greeting.txt"), content: "hello" },
         ]);
       });
+    });
+  });
+
+  describe("loadConfig", () => {
+    it("should read and resolve the default config", async () => {
+      const resolved = await loadConfig({ cwd: path.join(fixturesDir, "default") });
+
+      expect(resolved.port).toBe(1234);
+      expect(resolved.host).toBe("192.168.0.1");
+    });
+
+    it("should read and resolve the provided config path", async () => {
+      const resolved = await loadConfig({ configPath: path.join(fixturesDir, "vars.yml") });
+
+      expect(resolved.vars).toEqual({ GREETING: "hello" });
+    });
+
+    it("should apply override vars on top of the config vars", async () => {
+      const resolved = await loadConfig({
+        configPath: path.join(fixturesDir, "vars.yml"),
+        overrideVars: { GREETING: "howdy", NAME: "Vivian" },
+      });
+
+      expect(resolved.vars).toEqual({ GREETING: "howdy", NAME: "Vivian" });
+    });
+
+    it("should use defaults when the config file does not exist at the default path", async () => {
+      const resolved = await loadConfig({ cwd: path.join(fixturesDir, "empty") });
+
+      expect(resolved.port).toBe(DEFAULT_PORT);
+      expect(resolved.vars).toEqual({});
+      expect(resolved.files).toEqual([]);
     });
   });
 });

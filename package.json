@@ -6,6 +6,8 @@
     "velina-cli": "./velina-cli.ts"
   },
   "scripts": {
+    "dev": "bun --hot velina.ts",
+    "start": "bun velina.ts",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",

@@ -27,8 +27,7 @@ const zResolvableObject = z.union([
 // resolveValue normalizes them at read time.
 const zConfigResolvable = z.unknown();
 
-const zConfigFileEntry = z
-  .object({
+const zConfigFileEntry = z.object({
     path: z.string(),
     content: zConfigResolvable,
   })
@@ -48,8 +47,7 @@ const zConfig = z
     files: z.array(zConfigFileEntry),
     tasks: z.record(
       z.string(),
-      z
-        .object({
+      z.object({
           cmd: z.string(),
           args: z.array(z.string()).optional(),
           cwd: z.string().optional(),
@@ -359,4 +357,17 @@ export async function resolveConfig(
     files,
     tasks,
   };
+}
+
+export async function loadConfig(
+  opts: {
+    configPath?: string;
+    overrideVars?: Record<string, string>;
+    cwd?: string;
+  } = {},
+): Promise<ResolvedConfig> {
+  const { configPath, overrideVars, cwd } = opts;
+
+  const config = await readConfig({ configPath, cwd });
+  return resolveConfig(config, { overrideVars });
 }
