@@ -135,11 +135,11 @@ tasks:
 The `/api` path exposes a Cap'n Web RPC target with the following functions:
 
 ```ts
-import { RpcTarget } from 'capnweb';
+import { RpcTarget } from "capnweb";
 
 interface VelinaResolvedConfig {
-  port: number
-  host: string
+  port: number;
+  host: string;
   var: Record<string, unknown>;
   env: Record<string, string>;
   files: VelinaConfigFileEntry[];
@@ -148,8 +148,8 @@ interface VelinaResolvedConfig {
 }
 
 interface VelinaConfigFileEntry {
-  path: string
-  content: string
+  path: string;
+  content: string;
 }
 
 interface VelinaConfigTaskEntry {
@@ -162,10 +162,10 @@ interface VelinaConfigTaskEntry {
 interface VelinaTaskRun {
   id: string;
   task: {
-    cmd: string
+    cmd: string;
     cwd: string;
     env: Record<string, string>;
-  }
+  };
 }
 
 abstract class VelinaRPC extends RpcTarget {
@@ -177,7 +177,7 @@ abstract class VelinaRPC extends RpcTarget {
 
   abstract getTaskRun(id: string): VelinaTaskRun;
 
-  abstract streamTaskRun(id: string, type?: 'stdout' | 'stderr' | 'both'): ReadableStream;
+  abstract streamTaskRun(id: string, type?: "stdout" | "stderr" | "both"): ReadableStream;
 }
 ```
 
