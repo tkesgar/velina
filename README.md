@@ -237,6 +237,8 @@ The UI is built by Bun directly from `web/index.html`; there is no separate fron
 
 The `/api` path exposes a Cap'n Web RPC target. HTTP batch handles one-shot calls; WebSocket is required for log streaming. The server always binds to `127.0.0.1`.
 
+On `SIGINT` or `SIGTERM`, Velina stops accepting connections, terminates every running task (with a `SIGKILL` fallback after five seconds), waits for them to exit, and then exits itself. A second signal forces an immediate exit.
+
 ```ts
 import { newWebSocketRpcSession } from "capnweb";
 import type { VelinaApi } from "./lib/api";

@@ -167,27 +167,12 @@ export class Velina implements VelinaApi {
 
   async stopProcess(id: string): Promise<ProcessInfo> {
     const managed = this.#get(id);
-    if (managed.info.state === "stopped") {
-      return this.#snapshot(managed);
-    }
-
-    const subprocess = managed.subprocess;
-    if (subprocess) {
-      subprocess.kill("SIGTERM");
-      const timer = setTimeout(() => {
-        if (managed.info.state === "running") {
-          subprocess.kill("SIGKILL");
-        }
-      }, STOP_TIMEOUT_MS);
-
-      try {
-        await managed.exit;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-
+    await this.#terminate(managed);
     return this.#snapshot(managed);
+  }
+
+  async shutdown(): Promise<void> {
+    await Promise.all([...this.#processes.values()].map((managed) => this.#terminate(managed)));
   }
 
   deleteProcess(id: string): void {
@@ -205,6 +190,24 @@ export class Velina implements VelinaApi {
       if (managed.info.state === "running") {
         managed.subprocess?.kill("SIGTERM");
       }
+    }
+  }
+
+  async #terminate(managed: ManagedProcess): Promise<void> {
+    const subprocess = managed.subprocess;
+    if (!subprocess || managed.info.state === "stopped") return;
+
+    subprocess.kill("SIGTERM");
+    const timer = setTimeout(() => {
+      if (managed.info.state === "running") {
+        subprocess.kill("SIGKILL");
+      }
+    }, STOP_TIMEOUT_MS);
+
+    try {
+      await managed.exit;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

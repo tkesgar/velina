@@ -93,6 +93,32 @@ const httpServer = Bun.serve({
   logStartup: false,
 });
 
+let shuttingDown = false;
+let forcedShutdown = false;
+
+async function shutdown(): Promise<void> {
+  if (shuttingDown) {
+    // A second signal means the caller has lost patience; do not hang.
+    if (!forcedShutdown) {
+      forcedShutdown = true;
+      process.exit(1);
+    }
+    return;
+  }
+  shuttingDown = true;
+  httpServer.stop(true);
+  try {
+    await velina.shutdown();
+    process.exit(0);
+  } catch (error) {
+    console.error(error);
+    process.exit(1);
+  }
+}
+
+process.on("SIGINT", () => void shutdown());
+process.on("SIGTERM", () => void shutdown());
+
 const port = httpServer.port || loaded.resolved.port;
 const terminal: TerminalContext = {
   env: process.env,

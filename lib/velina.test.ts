@@ -232,6 +232,25 @@ describe("Velina", () => {
     });
   });
 
+  describe("shutdown", () => {
+    it("should stop every running process", async () => {
+      const velina = createVelina(
+        configWith({
+          first: evalTask("setInterval(() => {}, 50)"),
+          second: evalTask("setInterval(() => {}, 50)"),
+        }),
+      );
+
+      const first = velina.startTask("first");
+      const second = velina.startTask("second");
+
+      await velina.shutdown();
+
+      expect(velina.getProcess(first.id).state).toBe("stopped");
+      expect(velina.getProcess(second.id).state).toBe("stopped");
+    });
+  });
+
   describe("deleteProcess", () => {
     it("should reject deleting a running process", () => {
       const velina = createVelina(configWith({ loop: evalTask("setInterval(() => {}, 50)") }));
