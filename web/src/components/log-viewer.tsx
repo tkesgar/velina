@@ -50,8 +50,8 @@ export function LogViewer({ lines, error, type, onTypeChange }: LogViewerProps) 
         h="360px"
         overflowY="auto"
         borderRadius="md"
-        bg="gray.950"
-        color="gray.100"
+        bg="bg.subtle"
+        color="fg"
         p="3"
         fontFamily="mono"
         fontSize="xs"
@@ -59,13 +59,13 @@ export function LogViewer({ lines, error, type, onTypeChange }: LogViewerProps) 
       >
         {lines.map((entry, index) => (
           <Flex key={index} gap="2">
-            <Text as="span" color="gray.500">
+            <Text as="span" color="fg.muted">
               {new Date(entry.timestamp).toLocaleTimeString()}
             </Text>
             <Text as="span">{entry.line}</Text>
           </Flex>
         ))}
-        {error && <Text color="red.300">{error}</Text>}
+        {error && <Text color="fg.error">{error}</Text>}
         <div ref={endRef} />
       </Box>
     </Box>

@@ -44,7 +44,7 @@ export function AppShell() {
                       display="inline-flex"
                       alignItems="center"
                       gap="1.5"
-                      color={isActive ? "teal.600" : "fg.muted"}
+                      color={isActive ? "brand.fg" : "fg.muted"}
                       fontWeight={isActive ? "bold" : "normal"}
                     >
                       <item.icon aria-hidden="true" />
@@ -66,7 +66,7 @@ export function AppShell() {
               {isDark ? <FiSun aria-hidden="true" /> : <FiMoon aria-hidden="true" />}
             </Button>
             <Badge
-              colorPalette={connected ? "green" : "red"}
+              colorPalette={connected ? "brand" : "red"}
               display="inline-flex"
               alignItems="center"
               gap="1"

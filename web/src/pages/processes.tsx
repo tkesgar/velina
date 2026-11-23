@@ -60,7 +60,7 @@ export function ProcessesPage() {
       </Heading>
 
       {(processError || actionError) && (
-        <Box color="red.500" mb="4">
+        <Box color="fg.error" mb="4">
           {processError ?? actionError}
         </Box>
       )}
@@ -94,7 +94,7 @@ export function ProcessesPage() {
                   </Table.Cell>
                   <Table.Cell>{process.taskName}</Table.Cell>
                   <Table.Cell>
-                    <Badge colorPalette={process.state === "running" ? "green" : "gray"}>
+                    <Badge colorPalette={process.state === "running" ? "brand" : "gray"}>
                       {process.state}
                     </Badge>
                   </Table.Cell>
@@ -115,6 +115,7 @@ export function ProcessesPage() {
                       </Button>
                       <Button
                         size="xs"
+                        colorPalette="brand"
                         disabled={
                           process.state === "stopped" &&
                           processes.some(

@@ -15,7 +15,7 @@ export function ConfigPage() {
       </Heading>
 
       {error && (
-        <Text color="red.500" mb="4">
+        <Text color="fg.error" mb="4">
           {error}
         </Text>
       )}

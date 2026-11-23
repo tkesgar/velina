@@ -51,7 +51,7 @@ export function TasksPage() {
       </Heading>
 
       {(configError || processError || actionError) && (
-        <Box color="red.500" mb="4">
+        <Box color="fg.error" mb="4">
           {configError ?? processError ?? actionError}
         </Box>
       )}
@@ -82,7 +82,7 @@ export function TasksPage() {
                       </Button>
                     </Table.Cell>
                     <Table.Cell>
-                      <Badge colorPalette={isRunning ? "green" : "gray"}>
+                      <Badge colorPalette={isRunning ? "brand" : "gray"}>
                         {isRunning ? "running" : "idle"}
                       </Badge>
                     </Table.Cell>
@@ -100,7 +100,7 @@ export function TasksPage() {
                           </HStack>
                         </Button>
                       ) : (
-                        <Button size="xs" onClick={() => void start(name)}>
+                        <Button size="xs" colorPalette="brand" onClick={() => void start(name)}>
                           <HStack as="span" gap="1">
                             <FiPlay aria-hidden="true" />
                             Start
@@ -121,7 +121,7 @@ export function TasksPage() {
             <>
               <Flex align="center" gap="3" mb="3">
                 <Heading size="md">{selectedName}</Heading>
-                <Badge colorPalette={runningProcess ? "green" : "gray"}>
+                <Badge colorPalette={runningProcess ? "brand" : "gray"}>
                   {runningProcess ? "running" : "idle"}
                 </Badge>
                 {runningProcess ? (
@@ -137,7 +137,7 @@ export function TasksPage() {
                     </HStack>
                   </Button>
                 ) : (
-                  <Button size="sm" onClick={() => void start(selectedName)}>
+                  <Button size="sm" colorPalette="brand" onClick={() => void start(selectedName)}>
                     <HStack as="span" gap="1">
                       <FiPlay aria-hidden="true" />
                       Start
