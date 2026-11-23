@@ -14,6 +14,8 @@ Velina is a local task runner built on Bun. It scans `package.json` scripts, run
 | `lib/velina-rpc.ts`                    | `VelinaRpcTarget`, thin adapter over `Velina`                                                                           |
 | `lib/api.ts`                           | shared API types and `isYamlConfig()` guard                                                                             |
 | `lib/commands.ts`                      | `velina init`, `config check`, `schema` implementations                                                                 |
+| `assets/velina.txt`                    | ASCII art, imported as text by `lib/banner.ts`                                                                          |
+| `lib/banner.ts`                        | startup banner, terminal/agent detection, clipboard fallback                                                            |
 | `lib/cli-args.ts`, `lib/cli-client.ts` | CLI argument parsing and client helpers                                                                                 |
 | `web/`                                 | Vite-free frontend built by Bun's HTML import                                                                           |
 | `lib/tests/fixtures/`                  | config fixtures for tests                                                                                               |
@@ -53,7 +55,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 
 - `VelinaRpcTarget extends RpcTarget`. Only prototype methods are reachable over RPC; keep state in `#private` fields and use `#private` helpers, not TypeScript `private`.
 - `/api` handles both HTTP batch and WebSocket. Streaming requires WebSocket.
-- The server uses Bun's exported-object form with `routes: { "/ui/*": ui }`. Bun generates and serves hashed asset URLs automatically — no Vite, no proxy, no manual static handler.
+- The server uses an explicit `Bun.serve()` call with `routes: { "/ui/*": ui }` and `logStartup: false` (suppresses Bun's own startup line; the option is missing from `@types/bun`). Bun generates and serves hashed asset URLs automatically — no Vite, no proxy, no manual static handler. capnweb's WebSocket handler predates Bun's `(error, ws)` callback order, so it is wrapped with a small adapter.
 - `hostname` is hardcoded to `127.0.0.1`. Browser WebSocket upgrades from other origins are rejected.
 
 ### CLI
@@ -62,6 +64,12 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 - All structured output is JSON; `logs` prints timestamped lines by default and JSONL with `--json`.
 - One WebSocket session per invocation, disposed on exit. Port comes from local `.velina.yml` unless `--port` is given. Process ids may be abbreviated to a unique prefix.
 - Exit codes: `0` success, `1` API/runtime error, `2` usage error.
+
+### Startup banner
+
+- `lib/banner.ts` is pure and injectable; `velina.ts` supplies the terminal context and clipboard adapter. It is silenced unless stdout is a TTY, `TERM` is not `dumb`, and no CI/agent env marker is set. `VELINA_BANNER=1` forces it, `0` suppresses it.
+- The art prints only when the terminal is at least 56 columns by 33 rows; smaller terminals get the informational lines only. The CLI hint includes `--port <port>` only for non-default ports.
+- Clipboard support is best-effort: native helpers (`pbcopy`, `wl-copy`, `xclip`, `clip.exe`) first, OSC 52 on a TTY as a fallback, otherwise no notice.
 
 ### Web UI
 

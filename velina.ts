@@ -2,6 +2,14 @@
 
 import { newBunWebSocketRpcHandler, newHttpBatchRpcResponse } from "capnweb";
 
+import {
+  copyToClipboard,
+  createClipboardDeps,
+  formatBanner,
+  shouldPrintBanner,
+  shouldShowArt,
+  type TerminalContext,
+} from "./lib/banner";
 import { parseArgs } from "./lib/cli";
 import { handleCommand } from "./lib/commands";
 import { loadConfig } from "./lib/config";
@@ -42,7 +50,7 @@ const loaded = await loadConfig({
 const velina = new Velina(loaded);
 const rpcHandler = newBunWebSocketRpcHandler(() => new VelinaRpcTarget(velina));
 
-export default {
+const httpServer = Bun.serve({
   routes: { "/ui/*": ui },
   development: args.dev ? { hmr: true, console: true } : false,
   async fetch(req: Request, server: Bun.Server<undefined>) {
@@ -66,7 +74,30 @@ export default {
 
     return newHttpBatchRpcResponse(req, new VelinaRpcTarget(velina));
   },
-  websocket: rpcHandler,
+  websocket: {
+    ...rpcHandler,
+    // capnweb predates Bun's (error, ws) callback order.
+    error(error: Error, ws: Parameters<typeof rpcHandler.error>[0]) {
+      rpcHandler.error(ws, error);
+    },
+  },
   port: loaded.resolved.port,
   hostname: HOSTNAME,
+  // Bun's own startup line is replaced by the banner below.
+  // @ts-expect-error logStartup works at runtime but is missing from @types/bun.
+  logStartup: false,
+});
+
+const port = httpServer.port || loaded.resolved.port;
+const terminal: TerminalContext = {
+  env: process.env,
+  isTTY: Boolean(process.stdout.isTTY),
+  columns: process.stdout.columns,
+  rows: process.stdout.rows,
 };
+
+if (shouldPrintBanner(terminal)) {
+  const uiUrl = `http://127.0.0.1:${port}/ui/`;
+  const clipboard = copyToClipboard(uiUrl, terminal, createClipboardDeps());
+  process.stdout.write(formatBanner({ port, showArt: shouldShowArt(terminal), clipboard }));
+}

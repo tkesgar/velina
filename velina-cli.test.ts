@@ -5,6 +5,7 @@ import * as path from "node:path";
 import type { Subprocess } from "bun";
 
 import type { ProcessInfo } from "./lib/api";
+import { DEFAULT_PORT } from "./lib/config";
 
 const projectRoot = import.meta.dir;
 
@@ -12,6 +13,7 @@ let tempDir: string;
 let port: number;
 let server: Subprocess | undefined;
 let serverLog = "";
+let serverOut = "";
 
 function findFreePort(): number {
   const probe = Bun.serve({ port: 0, fetch: () => new Response() });
@@ -58,6 +60,12 @@ async function waitForServer(): Promise<void> {
   throw new Error(`Server did not start: ${serverLog}`);
 }
 
+async function waitForBanner(): Promise<void> {
+  for (let i = 0; i < 100 && !serverOut.includes("Velina is running"); i++) {
+    await Bun.sleep(20);
+  }
+}
+
 beforeAll(async () => {
   tempDir = mkdtempSync(path.join(tmpdir(), "velina-cli-test-"));
   port = findFreePort();
@@ -86,9 +94,23 @@ beforeAll(async () => {
       path.join(tempDir, "velina.json"),
     ],
     cwd: projectRoot,
+    env: { ...process.env, VELINA_BANNER: "1" },
     stdout: "pipe",
     stderr: "pipe",
   });
+
+  const stdout = server?.stdout;
+  if (stdout && typeof stdout !== "number") {
+    void (async () => {
+      const reader = stdout.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        serverOut += decoder.decode(value, { stream: true });
+      }
+    })();
+  }
 
   const stderr = server?.stderr;
   if (stderr && typeof stderr !== "number") {
@@ -113,6 +135,16 @@ afterAll(async () => {
 });
 
 describe("velina-cli", () => {
+  it("prints the startup banner instead of Bun's startup line", async () => {
+    await waitForBanner();
+
+    expect(serverOut).toContain(`Velina is running on port ${port}`);
+    expect(serverOut).toContain(`http://127.0.0.1:${port}/ui/`);
+    expect(serverOut).toContain("velina-cli ps");
+    if (port !== DEFAULT_PORT) expect(serverOut).toContain(`--port ${port}`);
+    expect(serverOut).not.toContain("Started server:");
+  });
+
   it("should print usage for --help", () => {
     const result = cli("--help");
 
