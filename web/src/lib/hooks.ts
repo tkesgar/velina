@@ -121,7 +121,11 @@ export function useProcessLogs(id: string | null, type: LogType) {
     void (async () => {
       try {
         const stream = await Promise.resolve(api.streamProcessLogs(id, type));
-        if (cancelled) return;
+        if (cancelled) {
+          // StrictMode's simulated unmount can cancel before the stream arrives.
+          void stream.cancel().catch(() => {});
+          return;
+        }
 
         reader = stream.getReader();
         while (!cancelled) {

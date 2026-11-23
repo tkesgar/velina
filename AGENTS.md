@@ -80,7 +80,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 ## Gotchas learned the hard way
 
 - Cap'n Web stub types collapse overloaded method signatures to the last one. Use a single union return type plus a type guard (`isYamlConfig`) instead of overloads on `VelinaApi`.
-- Cap'n Web stubs are callable. In React, `setState(stub)` is treated as an updater — use `setState(() => stub)`. Do not dispose the session in an effect cleanup; StrictMode was removed for this reason.
+- Cap'n Web stubs are callable. In React, `setState(stub)` is treated as an updater — use `setState(() => stub)`. StrictMode double-invokes state initializers, so the RPC session is created behind a `useRef` guard; do not dispose it in an effect cleanup. `useProcessLogs` cancels streams that arrive after cleanup so its double mount cannot leak a subscriber.
 - `next-themes` renders its pre-hydration `<script>` as a React child, which Bun places inside `#root` and React warns about. Keep the custom color-mode provider.
 - Chakra v3 font tokens are `heading`, `body`, and `mono` — there is no `sans` token.
 - `--dev` only enables HMR for Velina's own UI. Consumer projects scaffolded with `velina init` get only the `velina` script.

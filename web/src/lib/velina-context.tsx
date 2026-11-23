@@ -1,5 +1,5 @@
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 
 import type { VelinaApi } from "../../../lib/api";
 
@@ -18,15 +18,24 @@ function openSession(onBroken: () => void): RpcStub<VelinaApi> {
 }
 
 export function VelinaProvider({ children }: { children: ReactNode }) {
+  const session = useRef<RpcStub<VelinaApi> | null>(null);
+  const [connected, setConnected] = useState(true);
+
   const reconnect = useCallback(() => {
     setConnected(false);
+    session.current = openSession(reconnect);
     // A stub is callable, so React would treat a bare stub as a state updater.
-    setApi(() => openSession(reconnect));
+    setApi(() => session.current!);
     setConnected(true);
   }, []);
 
-  const [api, setApi] = useState(() => openSession(reconnect));
-  const [connected, setConnected] = useState(true);
+  // StrictMode invokes state initializers twice and discards one result, which
+  // would leave an extra session and broken handler behind. A ref survives the
+  // double render, so creation stays a one-time operation.
+  if (session.current === null) {
+    session.current = openSession(reconnect);
+  }
+  const [api, setApi] = useState(() => session.current!);
 
   return <VelinaContext.Provider value={{ api, connected }}>{children}</VelinaContext.Provider>;
 }
