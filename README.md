@@ -225,7 +225,7 @@ tasks:
 
 ## Web UI
 
-The web UI is served at `/ui/` on the server's port, for example `http://127.0.0.1:2222/ui/`. It redirects to `/ui/tasks`.
+The web UI is served at `/ui/` on the server's port, for example `http://127.0.0.1:2222/ui/`. It redirects to `/ui/tasks`. Unknown paths return `404 Not Found`, except requests that accept `text/html` (typically browsers), which are redirected to `/ui/`.
 
 - `/ui/tasks` lists all available tasks, shows whether one has a running process, and lets you start or stop a task and view its logs.
 - `/ui/processes` lists running and stopped processes, shows details and logs, and lets you stop, restart, or clean them up.

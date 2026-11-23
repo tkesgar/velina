@@ -61,6 +61,11 @@ const httpServer = Bun.serve({
     }
 
     if (pathname !== API_PATH) {
+      // A browser following a stale link gets the UI; everything else gets a
+      // plain 404. Temporary redirect so a typo is not cached permanently.
+      if (req.headers.get("accept")?.toLowerCase().includes("text/html")) {
+        return Response.redirect(new URL("/ui/", req.url), 302);
+      }
       return new Response("Not found", { status: 404 });
     }
 

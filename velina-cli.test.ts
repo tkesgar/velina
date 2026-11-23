@@ -145,6 +145,27 @@ describe("velina-cli", () => {
     expect(serverOut).not.toContain("Started server:");
   });
 
+  it("redirects browser requests for unknown paths to the UI", async () => {
+    const response = await fetch(`http://127.0.0.1:${port}/does-not-exist`, {
+      headers: { accept: "text/html,application/xhtml+xml" },
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(`http://127.0.0.1:${port}/ui/`);
+  });
+
+  it("returns 404 for unknown non-browser requests", async () => {
+    const json = await fetch(`http://127.0.0.1:${port}/does-not-exist`, {
+      headers: { accept: "application/json" },
+    });
+    expect(json.status).toBe(404);
+    expect(await json.text()).toBe("Not found");
+
+    const plain = await fetch(`http://127.0.0.1:${port}/does-not-exist`);
+    expect(plain.status).toBe(404);
+  });
+
   it("should print usage for --help", () => {
     const result = cli("--help");
 
