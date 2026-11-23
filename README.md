@@ -20,11 +20,36 @@ tasks:
 
 ## Installation
 
+### Requirements
+
+- [Bun](https://bun.com/docs/installation). Velina's server, CLI, and scanned tasks all run on Bun; make sure `bun` is on your `PATH`.
+
+### Install
+
 Install via GitHub:
 
 ```
 bun add -g github:tkesgar/velina
 ```
+
+This installs both `velina` and `velina-cli` globally. Check with `velina --help`.
+
+### Update
+
+A GitHub install is pinned to the commit resolved when it was installed, so `bun update -g` alone may not pick up newer commits. Reinstall to get the latest version:
+
+```
+bun remove -g @tkesgar/velina
+bun add -g github:tkesgar/velina
+```
+
+### Remove
+
+```
+bun remove -g @tkesgar/velina
+```
+
+This removes the global package and its two binaries. It does not touch project files — remove `.velina.yml` or files generated from your `files` config separately if you no longer need them.
 
 ## Usage
 
