@@ -3,6 +3,8 @@ import { YAML } from "bun";
 import * as path from "node:path";
 import { Eta } from "eta";
 
+import { isGlobKey, isNegatedKey, matchesGlob, matchesTaskGlob } from "./glob";
+
 const eta = new Eta({ useWith: true });
 
 // Explicitly wrapped resolvables, used to recognize values that should not be
@@ -34,7 +36,55 @@ const zConfigFileEntry = z
   })
   .strict();
 
-const zConfigEnv = z.record(z.string(), zConfigResolvable);
+const zConfigEnv = z
+  .record(z.string(), zConfigResolvable)
+  .superRefine((env, ctx) => {
+    for (const [key, value] of Object.entries(env)) {
+      if (!isGlobKey(key)) continue;
+
+      if (isNegatedKey(key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: "negated glob keys are only supported for tasks",
+        });
+      } else if (value !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: "glob keys must have a null value",
+        });
+      }
+    }
+  })
+  .describe("Environment values; wildcard keys delete matching variables.");
+
+const zConfigTasks = z
+  .record(
+    z.string(),
+    z
+      .object({
+        cmd: z.string(),
+        args: z.array(z.string()).optional(),
+        cwd: z.string().optional(),
+        env: zConfigEnv.optional(),
+        files: z.array(zConfigFileEntry).optional(),
+      })
+      .strict()
+      .nullable(),
+  )
+  .superRefine((tasks, ctx) => {
+    for (const [key, task] of Object.entries(tasks)) {
+      if (isGlobKey(key) && task !== null) {
+        ctx.addIssue({
+          code: "custom",
+          path: [key],
+          message: "glob keys must have a null value",
+        });
+      }
+    }
+  })
+  .describe("Task definitions; wildcard keys with null values delete tasks.");
 
 export const zConfig = z
   .object({
@@ -45,19 +95,7 @@ export const zConfig = z
     vars: z.record(z.string(), zConfigResolvable),
     env: zConfigEnv,
     files: z.array(zConfigFileEntry),
-    tasks: z.record(
-      z.string(),
-      z
-        .object({
-          cmd: z.string(),
-          args: z.array(z.string()).optional(),
-          cwd: z.string().optional(),
-          env: zConfigEnv.optional(),
-          files: z.array(zConfigFileEntry).optional(),
-        })
-        .strict()
-        .nullable(),
-    ),
+    tasks: zConfigTasks,
   })
   .partial()
   .strict();
@@ -170,6 +208,22 @@ export function resolveEnv(
   const resolvedEnv: Record<string, string> = { ...parentEnv };
 
   for (const [key, value] of Object.entries(env)) {
+    if (isGlobKey(key)) {
+      if (isNegatedKey(key)) {
+        throw new Error(`negated glob keys are not supported in env: ${key}`);
+      }
+      if (value !== null) {
+        throw new Error(`glob env keys must have a null value: ${key}`);
+      }
+
+      for (const existing of Object.keys(resolvedEnv)) {
+        if (matchesGlob(existing, key)) {
+          delete resolvedEnv[existing];
+        }
+      }
+      continue;
+    }
+
     if (value === null) {
       delete resolvedEnv[key];
     } else {
@@ -334,11 +388,26 @@ export async function resolveConfig(
     })),
   };
 
-  for (const [name, task] of Object.entries(config.tasks ?? {})) {
+  for (const [key, task] of Object.entries(config.tasks ?? {})) {
+    if (isGlobKey(key)) {
+      if (task !== null) {
+        throw new Error(`glob task keys must have a null value: ${key}`);
+      }
+
+      const negated = isNegatedKey(key);
+      const pattern = negated ? key.slice(1) : key;
+      for (const name of Object.keys(tasks)) {
+        if (matchesTaskGlob(name, pattern) !== negated) {
+          delete tasks[name];
+        }
+      }
+      continue;
+    }
+
     if (task === null) {
-      delete tasks[name];
+      delete tasks[key];
     } else {
-      tasks[name] = {
+      tasks[key] = {
         cmd: task.cmd,
         args: task.args ?? [],
         cwd: path.resolve(rootDir, task.cwd ?? "."),

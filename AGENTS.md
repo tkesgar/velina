@@ -9,6 +9,7 @@ Velina is a local task runner built on Bun. It scans `package.json` scripts, run
 | `velina.ts`                            | server entry and command dispatch (`init`, `config check`, `schema`, `--help`); default export is the Bun server object |
 | `velina-cli.ts`                        | CLI client for the API                                                                                                  |
 | `lib/config.ts`                        | Zod config schema, loading, resolution, `loadConfig()`                                                                  |
+| `lib/glob.ts`                          | wildcard key detection and env/task glob matching used by config resolution                                             |
 | `lib/velina.ts`                        | `Velina` process/log store (no Cap'n Web imports)                                                                       |
 | `lib/velina-rpc.ts`                    | `VelinaRpcTarget`, thin adapter over `Velina`                                                                           |
 | `lib/api.ts`                           | shared API types and `isYamlConfig()` guard                                                                             |
@@ -37,6 +38,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 
 - `zConfig` is strict: unknown keys are rejected. Missing `.velina.yml` is an empty config; an explicitly provided missing path is an error.
 - `readConfig()` parses YAML; `resolveConfig()` applies defaults, vars, env, files, and task scanning; `loadConfig()` returns `{ provided, resolved }`.
+- Wildcard keys delete env vars or tasks; they must be `null`, and negation (`!`) is tasks-only. Both maps are processed in declaration order, so a later explicit key can re-add or override a deleted entry.
 - `getConfig({ format: "yaml" })` returns `{ provided: string, resolved: string }` using `Bun.YAML.stringify(value, null, 2)`.
 - Scanned tasks receive the resolved root env. This is essential: `Bun.spawn` with `env: {}` has no `PATH`, so `bun` cannot be found.
 

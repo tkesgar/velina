@@ -194,6 +194,29 @@ Within `env` entries, `env` refers to the inherited environment; within files, i
 - Scanned tasks inherit the resolved root `env` (including `PATH` when `inheritEnv` is true) and have empty `files`.
 - Tasks defined in the config override scanned tasks of the same name; a `null` entry removes one.
 
+### Glob deletion
+
+Keys containing `*`, or starting with `!` for tasks, are globs. A glob key must have a `null` value; any other value is a config error caught by `velina config check`.
+
+```yaml
+env:
+  "NODE_*": null # Delete all NODE_* variables
+  "NUXT_*": null # Delete all NUXT_* variables
+tasks:
+  "packages/*": null # Delete all packages tasks
+  "!*:dev": null # Delete all non-dev tasks
+  "apps/frontend/*": null # Delete all apps/frontend tasks
+  "/*": null # Delete root tasks
+```
+
+- `*` matches any sequence of characters, including an empty one; every other character is literal. Env names are matched as written.
+- Task names are matched as slash-separated paths: a `:` in a task name or pattern is treated as `/`, so `apps/frontend:dev` is matched as `apps/frontend/dev`. This lets `packages/*` and `apps/frontend/*` match tasks below those directories.
+- `/*` matches only root tasks, those without a directory prefix.
+- A leading `*/`, as in `*:dev`, also matches unprefixed names, so `*:dev` covers `dev`, `lint:dev`, and `apps/frontend:dev`.
+- `!pattern` is valid only in `tasks`; it deletes every task that does _not_ match `pattern`. Negated env keys are rejected because they can silently erase inherited variables such as `PATH`.
+- Env globs delete from the inherited environment and from variables defined earlier in the same map at the point where the glob appears; later entries can add variables back.
+- Task globs follow declaration order too: a later explicit task can re-add a deleted one.
+
 ## Web UI
 
 The web UI is served at `/ui/` on the server's port, for example `http://127.0.0.1:2222/ui/`. It redirects to `/ui/tasks`.

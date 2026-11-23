@@ -78,6 +78,24 @@ describe("config", () => {
           readConfig({ configPath: path.join(fixturesDir, "typo-task-key.yml") }),
         ).rejects.toThrow();
       });
+
+      it("should throw error if a glob env key has a non-null value", async () => {
+        expect(
+          readConfig({ configPath: path.join(fixturesDir, "invalid-glob-env.yml") }),
+        ).rejects.toThrow("glob keys must have a null value");
+      });
+
+      it("should throw error if a glob task key has a non-null value", async () => {
+        expect(
+          readConfig({ configPath: path.join(fixturesDir, "invalid-glob-task.yml") }),
+        ).rejects.toThrow("glob keys must have a null value");
+      });
+
+      it("should throw error if an env key uses negation", async () => {
+        expect(
+          readConfig({ configPath: path.join(fixturesDir, "invalid-glob-negated-env.yml") }),
+        ).rejects.toThrow("negated glob keys are only supported for tasks");
+      });
     });
   });
 
@@ -219,6 +237,37 @@ describe("config", () => {
       );
 
       expect(resolved).toEqual({ KEEP: "kept" });
+    });
+
+    it("should remove every matching env key when the key is a glob", () => {
+      const resolved = resolveEnv(
+        { vars: {} },
+        { "NODE_*": null, GREETING: "hello" },
+        {
+          parentEnv: {
+            NODE_ENV: "old",
+            NODE_OPTIONS: "--old",
+            NUXT_ENV: "keep",
+            PATH: "/usr/bin",
+          },
+        },
+      );
+
+      expect(resolved).toEqual({ NUXT_ENV: "keep", PATH: "/usr/bin", GREETING: "hello" });
+    });
+
+    it("should apply env globs to keys defined earlier in the same map", () => {
+      const resolved = resolveEnv(
+        { vars: {} },
+        { NODE_ENV: "first", "NODE_*": null, NODE_OPTIONS: "second" },
+      );
+
+      expect(resolved).toEqual({ NODE_OPTIONS: "second" });
+    });
+
+    it("should reject a non-null value or negation for an env glob", () => {
+      expect(() => resolveEnv({ vars: {} }, { "NODE_*": "value" })).toThrow();
+      expect(() => resolveEnv({ vars: {} }, { "!NODE_*": null })).toThrow();
     });
   });
 
@@ -442,6 +491,101 @@ describe("config", () => {
         expect(resolved.tasks).toEqual({
           dev: { cmd: "pnpm", args: ["run", "dev", "--watch"], cwd: rootDir, env: {}, files: [] },
           custom: { cmd: "echo", args: ["hi"], cwd: rootDir, env: {}, files: [] },
+        });
+      });
+
+      describe("glob deletion", () => {
+        const mixedRoot = path.join(tasksFixtures, "mixed");
+        const allTasks = () => ({
+          dev: task(mixedRoot, "dev"),
+          build: task(mixedRoot, "build"),
+          "apps/frontend:dev": task(path.join(mixedRoot, "apps/frontend"), "dev"),
+          "apps/frontend:build": task(path.join(mixedRoot, "apps/frontend"), "build"),
+          "packages/utils:test": task(path.join(mixedRoot, "packages/utils"), "test"),
+        });
+
+        it("should delete tasks under a path prefix", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: { "packages/*": null, "apps/frontend/*": null },
+          });
+
+          expect(resolved.tasks).toEqual({ dev: allTasks().dev, build: allTasks().build });
+        });
+
+        it("should delete only root tasks for a leading slash pattern", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: { "/*": null },
+          });
+
+          expect(Object.keys(resolved.tasks)).toEqual([
+            "apps/frontend:dev",
+            "apps/frontend:build",
+            "packages/utils:test",
+          ]);
+        });
+
+        it("should delete all non-dev tasks with a negated glob", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: { "!*:dev": null },
+          });
+
+          expect(resolved.tasks).toEqual({
+            dev: allTasks().dev,
+            "apps/frontend:dev": allTasks()["apps/frontend:dev"],
+          });
+        });
+
+        it("should apply globs in declaration order", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: {
+              "packages/*": null,
+              "!*:dev": null,
+              "apps/frontend/*": null,
+              "/*": null,
+            },
+          });
+
+          expect(resolved.tasks).toEqual({});
+        });
+
+        it("should let a later exact task re-add a deleted task", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: { "/*": null, dev: { cmd: "echo" } },
+          });
+
+          expect(resolved.tasks.dev).toEqual({
+            cmd: "echo",
+            args: [],
+            cwd: mixedRoot,
+            env: {},
+            files: [],
+          });
+        });
+
+        it("should delete tasks defined earlier in the same config", async () => {
+          const resolved = await resolveConfig({
+            rootDir: mixedRoot,
+            inheritEnv: false,
+            tasks: { custom: { cmd: "echo" }, "*": null },
+          });
+
+          expect(resolved.tasks).toEqual({});
+        });
+
+        it("should reject a non-null value for a glob task key", async () => {
+          expect(resolveConfig({ tasks: { "packages/*": { cmd: "echo" } } })).rejects.toThrow(
+            "glob task keys must have a null value",
+          );
         });
       });
 

@@ -1,0 +1,10 @@
+{
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc"
+  }
+}
