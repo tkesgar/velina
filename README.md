@@ -87,7 +87,7 @@ Run `velina --help` for the full command list. The server always binds to `127.0
 
 From an interactive terminal, Velina prints an ASCII banner with its port, the web UI URL, and ready-to-run `velina-cli` commands. The CLI examples include `--port <port>` only when using a non-default port. The UI URL is copied to the clipboard when a helper (`pbcopy`, `wl-copy`, `xclip`, `clip.exe`) is available, or via the terminal's OSC 52 clipboard where supported; otherwise no copy notice is shown.
 
-The banner is silent when stdout is not a TTY, `TERM` is `dumb`, or common CI/agent environment variables are set. Set `VELINA_BANNER=1` to force it or `VELINA_BANNER=0` to suppress it. On small terminals the art is omitted and only the informational lines are printed.
+The banner is silent when stdout is not a TTY, `TERM` is `dumb`, or common CI/agent environment variables are set. Set `VELINA_BANNER=1` to force it or `VELINA_BANNER=0` to suppress it. The art is omitted only on terminals narrower than 56 columns, where it would wrap; a short terminal simply scrolls.
 
 ## Agent setup
 

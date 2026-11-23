@@ -69,15 +69,15 @@ describe("shouldPrintBanner", () => {
 });
 
 describe("shouldShowArt", () => {
-  it("requires enough columns and rows", () => {
-    expect(shouldShowArt(ctx({ columns: 54, rows: 40 }))).toBe(false);
-    expect(shouldShowArt(ctx({ columns: 100, rows: 24 }))).toBe(false);
-    expect(shouldShowArt(ctx({ columns: 56, rows: 33 }))).toBe(true);
+  it("requires enough columns regardless of height", () => {
+    expect(shouldShowArt(ctx({ columns: 54 }))).toBe(false);
+    expect(shouldShowArt(ctx({ columns: 100 }))).toBe(true);
+    expect(shouldShowArt(ctx({ columns: 56 }))).toBe(true);
   });
 
-  it("falls back to COLUMNS and LINES", () => {
-    expect(shouldShowArt(ctx({ env: { COLUMNS: "80", LINES: "40" } }))).toBe(true);
-    expect(shouldShowArt(ctx({ env: { COLUMNS: "40", LINES: "40" } }))).toBe(false);
+  it("falls back to COLUMNS", () => {
+    expect(shouldShowArt(ctx({ env: { COLUMNS: "80" } }))).toBe(true);
+    expect(shouldShowArt(ctx({ env: { COLUMNS: "40" } }))).toBe(false);
   });
 
   it("shows the art when dimensions are unknown", () => {

@@ -93,7 +93,6 @@ const terminal: TerminalContext = {
   env: process.env,
   isTTY: Boolean(process.stdout.isTTY),
   columns: process.stdout.columns,
-  rows: process.stdout.rows,
 };
 
 if (shouldPrintBanner(terminal)) {

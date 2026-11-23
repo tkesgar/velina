@@ -68,7 +68,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 ### Startup banner
 
 - `lib/banner.ts` is pure and injectable; `velina.ts` supplies the terminal context and clipboard adapter. It is silenced unless stdout is a TTY, `TERM` is not `dumb`, and no CI/agent env marker is set. `VELINA_BANNER=1` forces it, `0` suppresses it.
-- The art prints only when the terminal is at least 56 columns by 33 rows; smaller terminals get the informational lines only. The CLI hint includes `--port <port>` only for non-default ports.
+- The art prints when the terminal is at least 56 columns wide; height is ignored because vertical scrolling is harmless. Narrower terminals get the informational lines only. The CLI hint includes `--port <port>` only for non-default ports.
 - Clipboard support is best-effort: native helpers (`pbcopy`, `wl-copy`, `xclip`, `clip.exe`) first, OSC 52 on a TTY as a fallback, otherwise no notice.
 
 ### Web UI

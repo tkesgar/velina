@@ -9,7 +9,6 @@ export interface TerminalContext {
   env: Record<string, string | undefined>;
   isTTY: boolean;
   columns?: number;
-  rows?: number;
 }
 
 export type BannerMode = "auto" | "always" | "never";
@@ -71,9 +70,8 @@ function dimension(value: number | undefined, envValue: string | undefined): num
 }
 
 export function shouldShowArt(ctx: TerminalContext): boolean {
-  const columns = dimension(ctx.columns, ctx.env.COLUMNS);
-  const rows = dimension(ctx.rows, ctx.env.LINES);
-  return columns >= 56 && rows >= 33;
+  // Wrapping would destroy the art; scrolling vertically is harmless.
+  return dimension(ctx.columns, ctx.env.COLUMNS) >= 56;
 }
 
 export type ClipboardResult = "native" | "osc52" | "unsupported";
