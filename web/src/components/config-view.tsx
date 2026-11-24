@@ -11,12 +11,18 @@ const highlighter = await createHighlighterCore({
   engine: createJavaScriptRegexEngine(),
 });
 
-export function ConfigView({ value }: { value: unknown }) {
+export function ConfigView({ value, framed = true }: { value: unknown; framed?: boolean }) {
   const isYaml = typeof value === "string";
   const code = isYaml ? value : JSON.stringify(value, null, 2);
 
   return (
-    <Box maxH="70vh" overflow="auto" borderWidth="1px" borderRadius="md" fontSize="xs">
+    <Box
+      maxH="70vh"
+      overflow="auto"
+      borderWidth={framed ? "1px" : undefined}
+      borderRadius={framed ? "md" : undefined}
+      fontSize="xs"
+    >
       <ShikiHighlighter
         highlighter={highlighter}
         language={isYaml ? "yaml" : "json"}

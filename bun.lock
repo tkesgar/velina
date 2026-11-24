@@ -5,6 +5,7 @@
     "": {
       "name": "@tkesgar/velina",
       "dependencies": {
+        "@ark-ui/react": "5.40.0",
         "@chakra-ui/react": "^3.38.0",
         "@emotion/react": "^11.14.0",
         "@fontsource-variable/geist": "^5.3.0",

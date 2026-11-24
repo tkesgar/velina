@@ -1,11 +1,13 @@
 import { Box, Grid, Heading, Spinner, Text } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiSettings } from "react-icons/fi";
 
-import { ConfigView } from "../components/config-view";
-import { useYamlConfig } from "../lib/hooks";
+import { ConfigInspector } from "../components/config-inspector";
+import { useConfig, useYamlConfig } from "../lib/hooks";
 
 export function ConfigPage() {
-  const { config, error } = useYamlConfig();
+  const { config, error: configError } = useConfig();
+  const { config: yamlConfig, error: yamlError } = useYamlConfig();
+  const error = configError ?? yamlError;
 
   return (
     <Box>
@@ -19,23 +21,23 @@ export function ConfigPage() {
           {error}
         </Text>
       )}
-      {!config && !error && <Spinner />}
+      {!config && !yamlConfig && !error && <Spinner />}
 
-      {config && (
+      {config && yamlConfig && (
         <Grid templateColumns={{ base: "1fr", lg: "repeat(2, minmax(0, 1fr))" }} gap="4">
           <Box>
             <Heading size="sm" mb="2" display="flex" alignItems="center" gap="2">
               <FiFileText aria-hidden="true" />
               Provided
             </Heading>
-            <ConfigView value={config.provided} />
+            <ConfigInspector yaml={yamlConfig.provided} value={config.provided} />
           </Box>
           <Box>
             <Heading size="sm" mb="2" display="flex" alignItems="center" gap="2">
               <FiCheckCircle aria-hidden="true" />
               Resolved
             </Heading>
-            <ConfigView value={config.resolved} />
+            <ConfigInspector yaml={yamlConfig.resolved} value={config.resolved} />
           </Box>
         </Grid>
       )}
