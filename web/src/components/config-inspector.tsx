@@ -16,7 +16,7 @@ export function ConfigInspector({ yaml, value }: { yaml: string; value: unknown 
 
   return (
     <Box borderWidth="1px" borderRadius="md" overflow="hidden">
-      <Box px="2" py="1.5" borderBottomWidth="1px">
+      <Box px="2" py="1.5">
         <SegmentGroup.Root
           size="xs"
           value={mode}
@@ -34,11 +34,13 @@ export function ConfigInspector({ yaml, value }: { yaml: string; value: unknown 
         </SegmentGroup.Root>
       </Box>
 
-      {mode === "yaml" ? (
+      {/* Keep both views mounted: hiding the YAML pane avoids re-highlighting it. */}
+      <Box display={mode === "yaml" ? "block" : "none"}>
         <ConfigView value={yaml} framed={false} />
-      ) : (
+      </Box>
+      <Box display={mode === "tree" ? "block" : "none"}>
         <ConfigTreeView value={value} framed={false} />
-      )}
+      </Box>
     </Box>
   );
 }
