@@ -1,9 +1,72 @@
-# Velina config for this repository.
-# The `loop` task runs until stopped, which makes it handy for testing
-# the Stop button in the web UI.
+# Velina config for this repository. It doubles as a compact showcase of the
+# config surface: defaults, vars, env, task scanning, all three cwd forms, and
+# task groups. Run `bun velina-cli.ts config --format yaml` to see the result.
+
+port: 2222
+inheritEnv: true
+rootDir: .
+packageManager: bun
+
+vars:
+  GREETING: hello
+  TARGET: Fei
+  TODAY:
+    type: cmd
+    cmd: date
+
+env:
+  VELINA_DEMO: "Hello <%= vars.GREETING %>, <%= vars.TARGET %>!"
+
+# Files are written when the server starts; greeting.txt is gitignored.
+files:
+  - path: ./greeting.txt
+    content: Hello <%= vars.TARGET %>!
+
 tasks:
+  # package.json scripts are also scanned: dev, start, lint, lint:fix,
+  # format, format:check. This one runs until stopped, which makes it handy
+  # for testing the Stop button in the web UI.
   loop:
     cmd: bun
     args:
       - -e
       - "console.log('loop started'); setInterval(() => console.log('tick'), 1000)"
+
+  # String cwd: one task under its configured name.
+  where-am-i:
+    cmd: bun
+    args: [-e, "console.log(process.cwd())"]
+    cwd: .
+
+  # Array cwd: one task per path, prefixed with the path's basename. Repeated
+  # basenames add a numeric suffix: lib:inspect, lib-2:inspect, web:inspect.
+  inspect:
+    cmd: bun
+    args: [-e, "console.log('cwd:', process.cwd(), 'env:', process.env.VELINA_DEMO)"]
+    cwd:
+      - ./lib
+      - ./lib
+      - ./web
+
+  # Record cwd: the key is the prefix, the value is the cwd.
+  announce:
+    cmd: bun
+    args: [-e, "console.log(process.env.VELINA_DEMO)"]
+    cwd:
+      lib: ./lib
+      web: ./web
+
+  # Glob deletion: uncomment to remove the string-cwd task above. A leading
+  # `*/` pattern also covers unprefixed names.
+  # "*:where-am-i": null
+
+taskGroup:
+  # Simple form, referencing scanned tasks.
+  checks: [lint, format:check]
+
+  # Canonical form with globs, expanded against the final task set.
+  inspect-all:
+    tasks: ["*:inspect", "*:announce"]
+
+  # Groups can mix scanned, config-defined, and cwd-generated tasks.
+  showcase: [loop, lib:announce, web:announce]
