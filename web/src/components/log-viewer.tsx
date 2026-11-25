@@ -9,14 +9,17 @@ interface LogViewerProps {
   error: string | null;
   type: LogType;
   onTypeChange: (type: LogType) => void;
+  height?: string;
 }
 
-export function LogViewer({ lines, error, type, onTypeChange }: LogViewerProps) {
+export function LogViewer({ lines, error, type, onTypeChange, height = "360px" }: LogViewerProps) {
   const [follow, setFollow] = useState(true);
-  const endRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (follow) endRef.current?.scrollIntoView({ block: "end" });
+    if (!follow) return;
+    const container = containerRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [lines, follow]);
 
   return (
@@ -47,7 +50,8 @@ export function LogViewer({ lines, error, type, onTypeChange }: LogViewerProps) 
       </HStack>
 
       <Box
-        h="360px"
+        ref={containerRef}
+        h={height}
         overflowY="auto"
         borderRadius="md"
         bg="bg.subtle"
@@ -66,7 +70,6 @@ export function LogViewer({ lines, error, type, onTypeChange }: LogViewerProps) 
           </Flex>
         ))}
         {error && <Text color="fg.error">{error}</Text>}
-        <div ref={endRef} />
       </Box>
     </Box>
   );

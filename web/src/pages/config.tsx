@@ -1,7 +1,7 @@
 import { Box, Grid, Heading, Spinner, Text } from "@chakra-ui/react";
 import { FiCheckCircle, FiFileText, FiSettings } from "react-icons/fi";
 
-import { ConfigInspector } from "../components/config-inspector";
+import { DataInspector } from "../components/data-inspector";
 import { useConfig, useYamlConfig } from "../lib/hooks";
 
 export function ConfigPage() {
@@ -30,14 +30,14 @@ export function ConfigPage() {
               <FiFileText aria-hidden="true" />
               Provided
             </Heading>
-            <ConfigInspector yaml={yamlConfig.provided} value={config.provided} />
+            <DataInspector yaml={yamlConfig.provided} value={config.provided} />
           </Box>
           <Box>
             <Heading size="sm" mb="2" display="flex" alignItems="center" gap="2">
               <FiCheckCircle aria-hidden="true" />
               Resolved
             </Heading>
-            <ConfigInspector yaml={yamlConfig.resolved} value={config.resolved} />
+            <DataInspector yaml={yamlConfig.resolved} value={config.resolved} />
           </Box>
         </Grid>
       )}

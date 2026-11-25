@@ -4,9 +4,10 @@ interface SparklineProps {
   label: string;
   value: string;
   values: number[];
+  color?: string;
 }
 
-export function Sparkline({ label, value, values }: SparklineProps) {
+export function Sparkline({ label, value, values, color = "brand.fg" }: SparklineProps) {
   const width = 160;
   const height = 36;
   const points = values.filter((entry) => Number.isFinite(entry));
@@ -40,11 +41,12 @@ export function Sparkline({ label, value, values }: SparklineProps) {
       <Text fontSize="xs" color="fg.muted">
         {label}: {value}
       </Text>
-      <Box color="brand.fg">
+      <Box color={color} w="full">
         <svg
-          width={width}
+          width="100%"
           height={height}
           viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
           role="img"
           aria-label={`${label} history`}
         >
