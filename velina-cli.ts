@@ -8,11 +8,14 @@ import { formatLogLine, openApi, printJson, resolvePort, resolveProcessId } from
 
 const USAGE = `Usage:
   velina-cli config [--format yaml]       show provided and resolved config
+  velina-cli groups                       list task groups and their tasks
   velina-cli start <task>                 start a task
+  velina-cli start-group <group>          start every task in a group
   velina-cli ps                           list all processes
   velina-cli process <id>                 show process details
   velina-cli logs <id> [stdout|stderr]    stream process logs
   velina-cli stop <id>                    stop a process
+  velina-cli stop-group <group>           stop running tasks in a group
   velina-cli delete <id>                  delete a stopped process
 
 Options:
@@ -37,8 +40,14 @@ async function run(args: CliArgs, api: RpcStub<VelinaApi>): Promise<void> {
       printJson(await Promise.resolve(api.getConfig()));
       return;
     }
+    case "groups":
+      printJson(await Promise.resolve(api.getAllTaskGroups()));
+      return;
     case "start":
       printJson(await Promise.resolve(api.startTask(args.target!)));
+      return;
+    case "start-group":
+      printJson(await Promise.resolve(api.startTaskGroup(args.target!)));
       return;
     case "ps":
       printJson(await Promise.resolve(api.getAllProcesses()));
@@ -82,6 +91,9 @@ async function run(args: CliArgs, api: RpcStub<VelinaApi>): Promise<void> {
       printJson(await Promise.resolve(api.stopProcess(id)));
       return;
     }
+    case "stop-group":
+      printJson(await Promise.resolve(api.stopTaskGroup(args.target!)));
+      return;
     case "delete": {
       const id = await resolveProcessId(api, args.target!);
       await Promise.resolve(api.deleteProcess(id));

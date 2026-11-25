@@ -76,6 +76,9 @@ beforeAll(async () => {
           files: [],
         },
       },
+      taskGroup: {
+        loops: ["loop"],
+      },
     }),
   );
 
@@ -115,7 +118,11 @@ describe("Velina RPC", () => {
     const config = await api.getConfig();
     if (isYamlConfig(config)) throw new Error("Expected object config");
 
-    expect(config.provided).toEqual({ port, tasks: expect.any(Object) });
+    expect(config.provided).toEqual({
+      port,
+      tasks: expect.any(Object),
+      taskGroup: { loops: ["loop"] },
+    });
     expect(config.resolved.port).toBe(port);
     expect(Object.keys(config.resolved.tasks)).toContain("greet");
   });
@@ -159,8 +166,34 @@ describe("Velina RPC", () => {
     }
   });
 
+  it("should list task groups over RPC", async () => {
+    const groups = await api.getAllTaskGroups();
+    expect(groups).toHaveLength(1);
+    expect(groups[0].name).toBe("loops");
+    expect(groups[0].tasks).toEqual(["loop"]);
+  });
+
+  it("should start and stop a task group over RPC", async () => {
+    const processes = await api.startTaskGroup("loops");
+    expect(processes.map((process) => process.taskName)).toEqual(["loop"]);
+
+    try {
+      const stopped = await api.stopTaskGroup("loops");
+      expect(stopped).toHaveLength(1);
+      expect(stopped[0].state).toBe("stopped");
+    } finally {
+      for (const process of await api.getAllProcesses()) {
+        if (process.taskName !== "loop") continue;
+        await api.stopProcess(process.id);
+        api.deleteProcess(process.id);
+      }
+    }
+  });
+
   it("should validate arguments at the RPC boundary", async () => {
     await expectRejection(api.startTask(42 as unknown as string), "expected string");
+    await expectRejection(api.startTaskGroup(42 as unknown as string), "expected string");
+    await expectRejection(api.stopTaskGroup(42 as unknown as string), "expected string");
   });
 
   it("should answer HTTP batch calls", async () => {
@@ -170,5 +203,14 @@ describe("Velina RPC", () => {
     if (isYamlConfig(config)) throw new Error("Expected object config");
 
     expect(config.resolved.port).toBe(port);
+  });
+
+  it("should answer HTTP batch calls for task groups", async () => {
+    const batch = newHttpBatchRpcSession<VelinaApi>(`http://127.0.0.1:${port}/api`);
+    const groups = await batch.getAllTaskGroups();
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].name).toBe("loops");
+    expect(groups[0].tasks).toEqual(["loop"]);
   });
 });

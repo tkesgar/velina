@@ -40,6 +40,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 
 - `zConfig` is strict: unknown keys are rejected. Missing `.velina.yml` is an empty config; an explicitly provided missing path is an error.
 - `readConfig()` parses YAML; `resolveConfig()` applies defaults, vars, env, files, and task scanning; `loadConfig()` returns `{ provided, resolved }`.
+- `taskGroup` accepts a list of names or `{ tasks: [...] }`; both resolve to `Record<string, string[]>`. Groups are resolved after the task loop so globs (`*:e2e`, via `matchesTaskGlob`) see the final task set; unknown names, zero-match globs, negated patterns, and empty lists are errors. `config check` validates schema only, so semantic group errors surface at startup.
 - Wildcard keys delete env vars or tasks; they must be `null`, and negation (`!`) is tasks-only. Both maps are processed in declaration order, so a later explicit key can re-add or override a deleted entry.
 - `getConfig({ format: "yaml" })` returns `{ provided: string, resolved: string }` using `Bun.YAML.stringify(value, null, 2)`.
 - Scanned tasks receive the resolved root env. This is essential: `Bun.spawn` with `env: {}` has no `PATH`, so `bun` cannot be found.
@@ -50,6 +51,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 - A task has at most one running process; stopped tasks can be restarted.
 - Logs are line entries with timestamps, bounded at 5,000 per process and per subscriber. `streamProcessLogs` replays stored lines then follows live ones, registering the subscriber before replay with no `await` in between. Every stream has a `cancel()` handler to unsubscribe.
 - `stopProcess` sends SIGTERM with a SIGKILL fallback after five seconds, is idempotent, and keeps logs. `deleteProcess` only works on stopped processes.
+- `startTaskGroup` starts members in order, skips already-running ones (returning their current process), and rolls back processes it started if a later member fails. `stopTaskGroup` stops running members in parallel. Both throw for unknown group names.
 
 ### RPC and server
 
@@ -60,7 +62,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 
 ### CLI
 
-- One short subcommand per API method: `config`, `start`, `ps`, `process`, `logs`, `stop`, `delete`, plus `--help`.
+- One short subcommand per API method: `config`, `groups`, `start`, `start-group`, `ps`, `process`, `logs`, `stop`, `stop-group`, `delete`, plus `--help`.
 - All structured output is JSON; `logs` prints timestamped lines by default and JSONL with `--json`.
 - One WebSocket session per invocation, disposed on exit. Port comes from local `.velina.yml` unless `--port` is given. Process ids may be abbreviated to a unique prefix.
 - Exit codes: `0` success, `1` API/runtime error, `2` usage error.
@@ -76,6 +78,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 - React 19, React Router 8 declarative mode with `basename="/ui"`, Chakra UI v3, Feather icons via `react-icons`, Geist variable fonts, and `react-shiki/core` for YAML/JSON highlighting.
 - Color mode is a small local-storage provider in `web/src/lib/color-mode.tsx`; it applies `light`/`dark` to `<html>` and sets `colorScheme`.
 - Data comes from one Cap'n Web session in `web/src/lib/velina-context.tsx`. `useProcesses()` polls every second; `useProcessLogs()` cancels its reader on unmount or selection change.
+- `/tasks`, `/groups`, `/processes`, and `/config` are sibling pages. `web/src/pages/task-groups.tsx` reads groups from `useConfig()` and derives member state from `useProcesses()`; a later homepage is intended to combine tasks and groups on one page.
 
 ## Gotchas learned the hard way
 

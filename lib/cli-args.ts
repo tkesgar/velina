@@ -5,11 +5,14 @@ import type { LogType } from "./api";
 export type CliCommand =
   | "help"
   | "config"
+  | "groups"
   | "start"
+  | "start-group"
   | "ps"
   | "process"
   | "logs"
   | "stop"
+  | "stop-group"
   | "delete";
 
 export interface CliArgs {
@@ -21,7 +24,18 @@ export interface CliArgs {
   target?: string;
 }
 
-const commands: CliCommand[] = ["config", "start", "ps", "process", "logs", "stop", "delete"];
+const commands: CliCommand[] = [
+  "config",
+  "groups",
+  "start",
+  "start-group",
+  "ps",
+  "process",
+  "logs",
+  "stop",
+  "stop-group",
+  "delete",
+];
 
 export function parseCliArgs(argv: string[]): CliArgs {
   const { values, positionals } = nodeParseArgs({
@@ -67,14 +81,17 @@ export function parseCliArgs(argv: string[]): CliArgs {
 
   switch (command) {
     case "config":
+    case "groups":
     case "ps":
       if (target !== undefined) {
         throw new Error(`${command} takes no arguments`);
       }
       break;
     case "start":
+    case "start-group":
     case "process":
     case "stop":
+    case "stop-group":
     case "delete":
       if (!target) {
         throw new Error(`Missing argument for ${command}`);

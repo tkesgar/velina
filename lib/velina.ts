@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Subprocess } from "bun";
 
-import type { LogEntry, LogType, ProcessInfo, VelinaApi, YamlConfig } from "./api";
+import type { LogEntry, LogType, ProcessInfo, TaskGroupInfo, VelinaApi, YamlConfig } from "./api";
 import type { LoadedConfig, ResolvedConfig } from "./config";
 
 const MAX_LOG_ENTRIES = 5000;
@@ -71,15 +71,58 @@ export class Velina implements VelinaApi {
   }
 
   startTask(name: string): ProcessInfo {
+    return this.#snapshot(this.#start(name));
+  }
+
+  getAllTaskGroups(): TaskGroupInfo[] {
+    return Object.entries(this.#config.taskGroup ?? {}).map(([name, tasks]) => ({
+      name,
+      tasks: [...tasks],
+    }));
+  }
+
+  async startTaskGroup(name: string): Promise<ProcessInfo[]> {
+    const tasks = this.#groupTasks(name);
+    const started: ManagedProcess[] = [];
+    const processes: ProcessInfo[] = [];
+
+    try {
+      for (const taskName of tasks) {
+        const running = this.#runningFor(taskName);
+        if (running) {
+          processes.push(this.#snapshot(running));
+          continue;
+        }
+
+        const managed = this.#start(taskName);
+        started.push(managed);
+        processes.push(this.#snapshot(managed));
+      }
+    } catch (error) {
+      // Do not leave a half-started group behind.
+      await Promise.all(started.map((managed) => this.#terminate(managed)));
+      throw error;
+    }
+
+    return processes;
+  }
+
+  async stopTaskGroup(name: string): Promise<ProcessInfo[]> {
+    const running = this.#groupTasks(name)
+      .map((taskName) => this.#runningFor(taskName))
+      .filter((managed): managed is ManagedProcess => managed !== undefined);
+
+    return Promise.all(running.map((managed) => this.stopProcess(managed.info.id)));
+  }
+
+  #start(name: string): ManagedProcess {
     const task = this.#config.tasks[name];
     if (!task) {
       throw new Error(`Unknown task: ${name}`);
     }
 
-    for (const managed of this.#processes.values()) {
-      if (managed.info.taskName === name && managed.info.state === "running") {
-        throw new Error(`Task "${name}" is already running`);
-      }
+    if (this.#runningFor(name)) {
+      throw new Error(`Task "${name}" is already running`);
     }
 
     this.#writeFiles(task.files);
@@ -125,7 +168,7 @@ export class Velina implements VelinaApi {
       });
 
     this.#processes.set(info.id, managed);
-    return this.#snapshot(managed);
+    return managed;
   }
 
   getAllProcesses(): ProcessInfo[] {
@@ -209,6 +252,25 @@ export class Velina implements VelinaApi {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  #groupTasks(name: string): string[] {
+    const tasks = this.#config.taskGroup?.[name];
+    if (!tasks) {
+      throw new Error(`Unknown task group: ${name}`);
+    }
+
+    return tasks;
+  }
+
+  #runningFor(taskName: string): ManagedProcess | undefined {
+    for (const managed of this.#processes.values()) {
+      if (managed.info.taskName === taskName && managed.info.state === "running") {
+        return managed;
+      }
+    }
+
+    return undefined;
   }
 
   #get(id: string): ManagedProcess {

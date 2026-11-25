@@ -67,6 +67,13 @@ const zConfigTaskCwd = z.union([
     .refine((cwd) => Object.keys(cwd).length > 0, "cwd must have at least one entry"),
 ]);
 
+const zConfigTaskGroupMembers = z.array(z.string()).min(1);
+
+const zConfigTaskGroup = z.union([
+  zConfigTaskGroupMembers,
+  z.object({ tasks: zConfigTaskGroupMembers }).strict(),
+]);
+
 const zConfigTasks = z
   .record(
     z.string(),
@@ -104,6 +111,7 @@ export const zConfig = z
     env: zConfigEnv,
     files: z.array(zConfigFileEntry),
     tasks: zConfigTasks,
+    taskGroup: z.record(z.string(), zConfigTaskGroup),
   })
   .partial()
   .strict();
@@ -360,6 +368,53 @@ export interface ResolvedConfig {
       }>;
     }
   >;
+  taskGroup: Record<string, string[]>;
+}
+
+// === resolve task groups
+
+// Groups are resolved after all tasks, so globs see the final task set.
+function resolveTaskGroups(
+  groups: NonNullable<Config["taskGroup"]>,
+  tasks: ResolvedConfig["tasks"],
+): ResolvedConfig["taskGroup"] {
+  const resolved: ResolvedConfig["taskGroup"] = {};
+
+  for (const [name, group] of Object.entries(groups)) {
+    const members = Array.isArray(group) ? group : group.tasks;
+    const taskNames: string[] = [];
+    const seen = new Set<string>();
+
+    const add = (taskName: string) => {
+      if (seen.has(taskName)) return;
+      seen.add(taskName);
+      taskNames.push(taskName);
+    };
+
+    for (const member of members) {
+      if (isNegatedKey(member)) {
+        throw new Error(`negated task patterns are not supported in task groups: ${member}`);
+      }
+
+      if (!member.includes("*")) {
+        if (!Object.hasOwn(tasks, member)) {
+          throw new Error(`Unknown task "${member}" in task group "${name}"`);
+        }
+        add(member);
+        continue;
+      }
+
+      const matches = Object.keys(tasks).filter((taskName) => matchesTaskGlob(taskName, member));
+      if (matches.length === 0) {
+        throw new Error(`Task group "${name}" pattern "${member}" matched no tasks`);
+      }
+      for (const match of matches) add(match);
+    }
+
+    resolved[name] = taskNames;
+  }
+
+  return resolved;
 }
 
 // === expand task cwd
@@ -485,6 +540,7 @@ export async function resolveConfig(
     env,
     files,
     tasks,
+    taskGroup: resolveTaskGroups(config.taskGroup ?? {}, tasks),
   };
 }
 

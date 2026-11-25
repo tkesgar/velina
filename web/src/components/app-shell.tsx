@@ -1,6 +1,7 @@
 import { Badge, Box, Button, Flex, Heading, HStack, Text } from "@chakra-ui/react";
 import {
   FiActivity,
+  FiLayers,
   FiList,
   FiMoon,
   FiSettings,
@@ -16,6 +17,7 @@ import { useVelina } from "../lib/velina-context";
 
 const navigation = [
   { to: "/tasks", label: "Tasks", icon: FiList },
+  { to: "/groups", label: "Groups", icon: FiLayers },
   { to: "/processes", label: "Processes", icon: FiActivity },
   { to: "/config", label: "Config", icon: FiSettings },
 ];

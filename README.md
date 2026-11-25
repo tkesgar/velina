@@ -171,6 +171,11 @@ tasks:
     files:
       - path: ./foo
         content: Hello <%= vars.VAR2 %>!
+# Groups start several tasks together. A list and { tasks: [...] } are equivalent.
+taskGroup:
+  services-dev: [frontend:dev, backend:dev]
+  all-e2e:
+    tasks: ["*:e2e"]
 ```
 
 Unknown keys are rejected. A missing `.velina.yml` or an empty one is treated as an empty configuration; an explicitly provided config path that does not exist is an error.
@@ -230,6 +235,23 @@ tasks:
       # -> frontend:lint, backend:lint
 ```
 
+### Task groups
+
+A task group runs several tasks together. Each group is either a list of task names or an object with a `tasks` list:
+
+```yaml
+taskGroup:
+  services-dev: [frontend:dev, backend:dev]
+  services-build:
+    tasks: [frontend:build, backend:build]
+  e2e:
+    tasks: ["*:e2e"]
+```
+
+Members may be exact task names or patterns containing `*`. Patterns use the same matching rules as glob deletion, so `*:e2e` matches both the root task `e2e` and prefixed tasks such as `frontend:e2e`. Negated patterns (`!`) are not supported in groups. Duplicate members are removed, keeping the first occurrence.
+
+Groups are resolved after all tasks — including scanned tasks, multi-cwd tasks, and task deletions — so a group sees the final task set. An empty list, an unknown task name, a negated pattern, or a pattern matching no tasks is an error during config resolution (reported when Velina starts). Starting a group starts its members in order, skips members that are already running, and stops the ones it started if a later member fails.
+
 ### Glob deletion
 
 Keys containing `*`, or starting with `!` for tasks, are globs. A glob key must have a `null` value; any other value is a config error caught by `velina config check`.
@@ -261,7 +283,7 @@ The web UI is served at `/ui/` on the server's port, for example `http://127.0.0
 - `/ui/processes` lists running and stopped processes, shows details and logs, and lets you stop, restart, or clean them up.
 - `/ui/config` shows both the provided and fully resolved configuration.
 
-The UI is built by Bun directly from `web/index.html`; there is no separate frontend build or dev server. Run `velina --dev` to enable hot reloading while working on it. The header has a light/dark switcher whose choice is stored in local storage.
+The UI is built by Bun directly from `web/index.html`; there is no separate frontend build or dev server. Run `velina --dev` to enable hot reloading while working on it. The header has a light/dark switcher whose choice is stored in local storage. The Groups page starts and stops task groups and shows logs for their members.
 
 ## API
 
@@ -277,6 +299,8 @@ using api = newWebSocketRpcSession<VelinaApi>("ws://127.0.0.1:2222/api");
 
 const { provided, resolved } = await api.getConfig();
 const yaml = await api.getConfig({ format: "yaml" }); // { provided: string, resolved: string }
+const groups = await api.getAllTaskGroups();
+const processes = await api.startTaskGroup("services-dev");
 const process = await api.startTask("backend:dev");
 
 for await (const entry of await api.streamProcessLogs(process.id, "stdout")) {
@@ -284,17 +308,21 @@ for await (const entry of await api.streamProcessLogs(process.id, "stdout")) {
 }
 
 await api.stopProcess(process.id);
+await api.stopTaskGroup("services-dev");
 api.deleteProcess(process.id);
 ```
 
 | Function                      | Description                                                                                                                                                          |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `getConfig(opts?)`            | `{ provided, resolved }`: the parsed config and the fully resolved config, including all available tasks. Pass `{ format: "yaml" }` to receive both as YAML strings. |
+| `getAllTaskGroups()`          | All task groups with their resolved member task names.                                                                                                               |
 | `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                                                        |
+| `startTaskGroup(name)`        | Starts every task in a group, skipping members already running; returns one process per member.                                                                      |
 | `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                                                          |
 | `getProcess(id)`              | Details for one process.                                                                                                                                             |
 | `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops.                                        |
 | `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.                                               |
+| `stopTaskGroup(name)`         | Stops the running members of a group and returns their final process details.                                                                                        |
 | `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                                                       |
 
 A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, and `cwd`. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
@@ -308,11 +336,14 @@ The API runs local commands without authentication. Browser WebSocket connection
 ```
 velina-cli config                       provided and resolved config
 velina-cli config --format yaml         resolved config as YAML
+velina-cli groups                       list task groups and their tasks
 velina-cli start <task>                 start a task
+velina-cli start-group <group>          start every task in a group
 velina-cli ps                           list all processes
 velina-cli process <id>                 show process details
 velina-cli logs <id> [stdout|stderr]    stream logs (default stdout)
 velina-cli stop <id>                    stop a process
+velina-cli stop-group <group>           stop running tasks in a group
 velina-cli delete <id>                  delete a stopped process
 ```
 

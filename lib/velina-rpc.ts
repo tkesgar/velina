@@ -1,7 +1,7 @@
 import { RpcTarget } from "capnweb";
 import * as z from "zod";
 
-import type { LogEntry, LogType, ProcessInfo, VelinaApi, YamlConfig } from "./api";
+import type { LogEntry, LogType, ProcessInfo, TaskGroupInfo, VelinaApi, YamlConfig } from "./api";
 import type { LoadedConfig } from "./config";
 import type { Velina } from "./velina";
 
@@ -26,8 +26,16 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
     return this.#velina.getConfig();
   }
 
+  getAllTaskGroups(): TaskGroupInfo[] {
+    return this.#velina.getAllTaskGroups();
+  }
+
   startTask(name: string): ProcessInfo {
     return this.#velina.startTask(zName.parse(name));
+  }
+
+  async startTaskGroup(name: string): Promise<ProcessInfo[]> {
+    return this.#velina.startTaskGroup(zName.parse(name));
   }
 
   getAllProcesses(): ProcessInfo[] {
@@ -44,6 +52,10 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
 
   async stopProcess(id: string): Promise<ProcessInfo> {
     return this.#velina.stopProcess(zName.parse(id));
+  }
+
+  async stopTaskGroup(name: string): Promise<ProcessInfo[]> {
+    return this.#velina.stopTaskGroup(zName.parse(name));
   }
 
   deleteProcess(id: string): void {

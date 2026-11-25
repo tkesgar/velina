@@ -22,6 +22,11 @@ export interface ProcessInfo {
   cwd: string;
 }
 
+export interface TaskGroupInfo {
+  name: string;
+  tasks: string[];
+}
+
 // Shared between the server target and the CLI client. Cap'n Web needs no
 // generated interface: this is the API description.
 export interface YamlConfig {
@@ -35,10 +40,13 @@ export function isYamlConfig(value: LoadedConfig | YamlConfig): value is YamlCon
 
 export interface VelinaApi {
   getConfig(opts?: { format?: "yaml" }): LoadedConfig | YamlConfig;
+  getAllTaskGroups(): TaskGroupInfo[];
   startTask(name: string): ProcessInfo;
+  startTaskGroup(name: string): Promise<ProcessInfo[]>;
   getAllProcesses(): ProcessInfo[];
   getProcess(id: string): ProcessInfo;
   streamProcessLogs(id: string, type: LogType): ReadableStream<LogEntry>;
   stopProcess(id: string): Promise<ProcessInfo>;
+  stopTaskGroup(name: string): Promise<ProcessInfo[]>;
   deleteProcess(id: string): void;
 }

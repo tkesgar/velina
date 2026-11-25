@@ -10,6 +10,7 @@ describe("parseCliArgs", () => {
 
   it("should parse commands without targets", () => {
     expect(parseCliArgs(["config"])).toEqual({ command: "config", json: false });
+    expect(parseCliArgs(["groups"])).toEqual({ command: "groups", json: false });
     expect(parseCliArgs(["ps"])).toEqual({ command: "ps", json: false });
   });
 
@@ -23,6 +24,16 @@ describe("parseCliArgs", () => {
       command: "delete",
       json: false,
       target: "abc123",
+    });
+    expect(parseCliArgs(["start-group", "services-dev"])).toEqual({
+      command: "start-group",
+      json: false,
+      target: "services-dev",
+    });
+    expect(parseCliArgs(["stop-group", "services-dev"])).toEqual({
+      command: "stop-group",
+      json: false,
+      target: "services-dev",
     });
   });
 
@@ -52,10 +63,13 @@ describe("parseCliArgs", () => {
   it("should reject unknown commands and extra arguments", () => {
     expect(() => parseCliArgs(["unknown"])).toThrow("Unknown command");
     expect(() => parseCliArgs(["config", "extra"])).toThrow("takes no arguments");
+    expect(() => parseCliArgs(["groups", "extra"])).toThrow("takes no arguments");
   });
 
   it("should reject missing targets", () => {
     expect(() => parseCliArgs(["start"])).toThrow("Missing argument");
+    expect(() => parseCliArgs(["start-group"])).toThrow("Missing argument");
+    expect(() => parseCliArgs(["stop-group"])).toThrow("Missing argument");
     expect(() => parseCliArgs(["logs"])).toThrow("Missing process id");
   });
 

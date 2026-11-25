@@ -83,6 +83,9 @@ beforeAll(async () => {
           files: [],
         },
       },
+      taskGroup: {
+        greeters: ["greet"],
+      },
     }),
   );
 
@@ -220,6 +223,25 @@ describe("velina-cli", () => {
     expect((JSON.parse(remaining.stdout) as ProcessInfo[]).map((p) => p.id)).not.toContain(
       process.id,
     );
+  });
+
+  it("should manage a task group through the CLI", () => {
+    const listed = cli("groups");
+    expect(listed.exitCode).toBe(0);
+    expect(JSON.parse(listed.stdout)).toEqual([{ name: "greeters", tasks: ["greet"] }]);
+
+    const started = cli("start-group", "greeters");
+    expect(started.exitCode).toBe(0);
+    const processes = JSON.parse(started.stdout) as ProcessInfo[];
+    expect(processes.map((process) => process.taskName)).toEqual(["greet"]);
+    expect(processes[0].state).toBe("running");
+
+    const stopped = cli("stop-group", "greeters");
+    expect(stopped.exitCode).toBe(0);
+    expect((JSON.parse(stopped.stdout) as ProcessInfo[])[0].state).toBe("stopped");
+
+    const deleted = cli("delete", processes[0].id);
+    expect(deleted.exitCode).toBe(0);
   });
 
   it("should exit with code 2 on a usage error", () => {

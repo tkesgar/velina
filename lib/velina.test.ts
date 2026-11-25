@@ -19,10 +19,11 @@ function createVelina(config: LoadedConfig): Velina {
 function configWith(
   tasks: ResolvedConfig["tasks"],
   files: ResolvedConfig["files"] = [],
+  taskGroup: ResolvedConfig["taskGroup"] = {},
 ): LoadedConfig {
   return {
     provided: {},
-    resolved: { port: 2222, vars: {}, env: {}, files, tasks },
+    resolved: { port: 2222, vars: {}, env: {}, files, tasks, taskGroup },
   };
 }
 
@@ -82,7 +83,7 @@ describe("Velina", () => {
     it("should return the config as YAML when requested", () => {
       const velina = createVelina({
         provided: { port: 1234, vars: { GREETING: "hello" } },
-        resolved: { port: 1234, vars: {}, env: {}, files: [], tasks: {} },
+        resolved: { port: 1234, vars: {}, env: {}, files: [], tasks: {}, taskGroup: {} },
       });
 
       const yaml = velina.getConfig({ format: "yaml" });
@@ -145,6 +146,60 @@ describe("Velina", () => {
       velina.startTask("greet");
 
       expect(readFileSync(taskFile, "utf8")).toBe("task content");
+    });
+  });
+
+  describe("task groups", () => {
+    const loop = () => evalTask("setInterval(() => {}, 50)");
+
+    it("should list groups with their tasks", () => {
+      const velina = createVelina(configWith({ a: loop(), b: loop() }, [], { dev: ["a", "b"] }));
+
+      expect(velina.getAllTaskGroups()).toEqual([{ name: "dev", tasks: ["a", "b"] }]);
+    });
+
+    it("should start every task in a group", async () => {
+      const velina = createVelina(configWith({ a: loop(), b: loop() }, [], { dev: ["a", "b"] }));
+
+      const processes = await velina.startTaskGroup("dev");
+
+      expect(processes.map((process) => process.taskName)).toEqual(["a", "b"]);
+      expect(processes.every((process) => process.state === "running")).toBe(true);
+      expect(velina.getAllProcesses()).toHaveLength(2);
+    });
+
+    it("should reuse processes for members that are already running", async () => {
+      const velina = createVelina(configWith({ a: loop(), b: loop() }, [], { dev: ["a", "b"] }));
+      const existing = velina.startTask("a");
+
+      const processes = await velina.startTaskGroup("dev");
+
+      expect(processes[0].id).toBe(existing.id);
+      expect(processes[1].taskName).toBe("b");
+      expect(velina.getAllProcesses()).toHaveLength(2);
+    });
+
+    it("should throw for an unknown group", async () => {
+      const velina = createVelina(configWith({ a: loop() }));
+
+      await expect(velina.startTaskGroup("dev")).rejects.toThrow("Unknown task group: dev");
+      await expect(velina.stopTaskGroup("dev")).rejects.toThrow("Unknown task group: dev");
+    });
+
+    it("should stop only the running members of a group", async () => {
+      const velina = createVelina(
+        configWith({ a: loop(), b: loop(), other: loop() }, [], { dev: ["a", "b"] }),
+      );
+      const processes = await velina.startTaskGroup("dev");
+      const untouched = velina.startTask("other");
+
+      const stopped = await velina.stopTaskGroup("dev");
+
+      expect(stopped.map((process) => process.id).sort()).toEqual(
+        processes.map((process) => process.id).sort(),
+      );
+      expect(stopped.every((process) => process.state === "stopped")).toBe(true);
+      expect(velina.getProcess(untouched.id).state).toBe("running");
     });
   });
 
