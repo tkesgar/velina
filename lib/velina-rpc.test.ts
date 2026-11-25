@@ -190,8 +190,26 @@ describe("Velina RPC", () => {
     }
   });
 
+  it("should return host and process metrics over RPC", async () => {
+    const host = await api.getHostMetrics();
+    expect(host.supported).toBe(true);
+
+    const process = await api.startTask("loop");
+    try {
+      await Bun.sleep(1100);
+      const metrics = await api.getProcessMetrics(process.id);
+      expect(metrics.processId).toBe(process.id);
+      expect(metrics.samples.length).toBeGreaterThan(0);
+      expect(metrics.latest).not.toBeNull();
+    } finally {
+      await api.stopProcess(process.id);
+      api.deleteProcess(process.id);
+    }
+  });
+
   it("should validate arguments at the RPC boundary", async () => {
     await expectRejection(api.startTask(42 as unknown as string), "expected string");
+    await expectRejection(api.getProcessMetrics(42 as unknown as string), "expected string");
     await expectRejection(api.startTaskGroup(42 as unknown as string), "expected string");
     await expectRejection(api.stopTaskGroup(42 as unknown as string), "expected string");
   });

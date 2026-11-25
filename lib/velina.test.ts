@@ -5,13 +5,17 @@ import * as path from "node:path";
 
 import type { LogEntry, ProcessState } from "./api";
 import type { LoadedConfig, ResolvedConfig } from "./config";
+import { nullMetricsSource, type MetricsSource } from "./metrics";
 import { Velina } from "./velina";
 
 const instances: Velina[] = [];
 const tempDirs: string[] = [];
 
-function createVelina(config: LoadedConfig): Velina {
-  const velina = new Velina(config);
+function createVelina(
+  config: LoadedConfig,
+  opts: { metricsSource?: MetricsSource; metricsIntervalMs?: number } = {},
+): Velina {
+  const velina = new Velina(config, opts);
   instances.push(velina);
   return velina;
 }
@@ -284,6 +288,76 @@ describe("Velina", () => {
       const stopped = await velina.stopProcess(process.id);
       expect(stopped.state).toBe("stopped");
       expect(stopped.exitCode).toBe(0);
+    });
+  });
+
+  describe("metrics", () => {
+    const source: MetricsSource = {
+      supported: true,
+      async readProcess(pid) {
+        return {
+          pid,
+          state: "S",
+          userCpuMs: 1000,
+          systemCpuMs: 500,
+          memoryBytes: 1024 * 1024,
+          threads: 2,
+          openFiles: 4,
+          openSockets: 1,
+          diskReadBytes: 1000,
+          diskWriteBytes: 2000,
+        };
+      },
+      async readChildren() {
+        return [];
+      },
+      async readHostNetwork() {
+        return { rxBytes: 5000, txBytes: 9000 };
+      },
+    };
+    const loop = () => evalTask("setInterval(() => {}, 50)");
+
+    it("should sample running processes and host network", async () => {
+      const velina = createVelina(configWith({ loop: loop() }), {
+        metricsSource: source,
+        metricsIntervalMs: 10,
+      });
+      const process = velina.startTask("loop");
+      await Bun.sleep(80);
+
+      const metrics = velina.getProcessMetrics(process.id);
+      expect(metrics.supported).toBe(true);
+      expect(metrics.samples.length).toBeGreaterThan(0);
+      expect(metrics.latest?.memoryBytes).toBe(1024 * 1024);
+      expect(velina.getProcess(process.id).metrics).toEqual(metrics.latest);
+      expect(velina.getHostMetrics().latest?.rxBytes).toBe(5000);
+    });
+
+    it("should stop sampling on dispose", async () => {
+      const velina = createVelina(configWith({ loop: loop() }), {
+        metricsSource: source,
+        metricsIntervalMs: 10,
+      });
+      velina.startTask("loop");
+      await Bun.sleep(80);
+      const before = velina.getProcessMetrics(velina.getAllProcesses()[0].id).samples.length;
+
+      velina[Symbol.dispose]();
+      await Bun.sleep(80);
+
+      expect(velina.getProcessMetrics(velina.getAllProcesses()[0].id).samples.length).toBe(before);
+    });
+
+    it("should reject metrics for an unknown process", () => {
+      const velina = createVelina(configWith({}), { metricsSource: source });
+
+      expect(() => velina.getProcessMetrics("missing")).toThrow("Unknown process: missing");
+    });
+
+    it("should report unsupported platforms", () => {
+      const velina = createVelina(configWith({}), { metricsSource: nullMetricsSource });
+
+      expect(velina.getHostMetrics()).toEqual({ supported: false, latest: null, samples: [] });
     });
   });
 

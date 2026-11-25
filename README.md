@@ -319,13 +319,23 @@ api.deleteProcess(process.id);
 | `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                                                        |
 | `startTaskGroup(name)`        | Starts every task in a group, skipping members already running; returns one process per member.                                                                      |
 | `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                                                          |
-| `getProcess(id)`              | Details for one process.                                                                                                                                             |
+| `getProcess(id)`              | Details for one process, including its latest metrics sample.                                                                                                        |
+| `getProcessMetrics(id)`       | Bounded history and latest sample of process metrics.                                                                                                                |
+| `getHostMetrics()`            | Bounded history of host-wide network rates.                                                                                                                          |
 | `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops.                                        |
 | `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.                                               |
 | `stopTaskGroup(name)`         | Stops the running members of a group and returns their final process details.                                                                                        |
 | `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                                                       |
 
-A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, and `cwd`. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
+A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, `cwd`, and `metrics` (the latest sample, or `null`). Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
+
+### Metrics
+
+While a process is running, Velina samples it once per second and keeps the last 600 samples. A sample includes CPU percentage, resident and virtual memory, thread and file-descriptor counts, socket count, disk read/write totals and rates, descendant count, and process state. Metrics are aggregated across the process tree, which matters because most tasks run through a package-manager wrapper. CPU percentage is per-core and may exceed 100% for multithreaded tasks.
+
+`getHostMetrics()` reports network receive/transmit rates across all interfaces except loopback. It is host-wide, not per task: Linux does not expose per-process network throughput through `/proc`, and the collector deliberately avoids netlink or eBPF instrumentation.
+
+Collection is Linux-only today. On macOS and Windows the API reports `supported: false` with no samples, and the UI hides unavailable figures. The platform-specific reader sits behind a small `MetricsSource` interface, so additional platforms can be added without changing storage, RPC, CLI, or UI code.
 
 The API runs local commands without authentication. Browser WebSocket connections from other origins are rejected, but do not expose the port through a proxy or tunnel.
 
@@ -341,6 +351,7 @@ velina-cli start <task>                 start a task
 velina-cli start-group <group>          start every task in a group
 velina-cli ps                           list all processes
 velina-cli process <id>                 show process details
+velina-cli metrics <id>                 show process metrics history
 velina-cli logs <id> [stdout|stderr]    stream logs (default stdout)
 velina-cli stop <id>                    stop a process
 velina-cli stop-group <group>           stop running tasks in a group

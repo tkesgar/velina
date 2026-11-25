@@ -1,7 +1,16 @@
 import { RpcTarget } from "capnweb";
 import * as z from "zod";
 
-import type { LogEntry, LogType, ProcessInfo, TaskGroupInfo, VelinaApi, YamlConfig } from "./api";
+import type {
+  HostMetrics,
+  LogEntry,
+  LogType,
+  ProcessInfo,
+  ProcessMetrics,
+  TaskGroupInfo,
+  VelinaApi,
+  YamlConfig,
+} from "./api";
 import type { LoadedConfig } from "./config";
 import type { Velina } from "./velina";
 
@@ -44,6 +53,14 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
 
   getProcess(id: string): ProcessInfo {
     return this.#velina.getProcess(zName.parse(id));
+  }
+
+  getProcessMetrics(id: string): ProcessMetrics {
+    return this.#velina.getProcessMetrics(zName.parse(id));
+  }
+
+  getHostMetrics(): HostMetrics {
+    return this.#velina.getHostMetrics();
   }
 
   streamProcessLogs(id: string, type: LogType): ReadableStream<LogEntry> {

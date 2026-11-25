@@ -4,21 +4,22 @@ Velina is a local task runner built on Bun. It scans `package.json` scripts, run
 
 ## Layout
 
-| Path                                   | Purpose                                                                                                                 |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `velina.ts`                            | server entry and command dispatch (`init`, `config check`, `schema`, `--help`); default export is the Bun server object |
-| `velina-cli.ts`                        | CLI client for the API                                                                                                  |
-| `lib/config.ts`                        | Zod config schema, loading, resolution, `loadConfig()`                                                                  |
-| `lib/glob.ts`                          | wildcard key detection and env/task glob matching used by config resolution                                             |
-| `lib/velina.ts`                        | `Velina` process/log store (no Cap'n Web imports)                                                                       |
-| `lib/velina-rpc.ts`                    | `VelinaRpcTarget`, thin adapter over `Velina`                                                                           |
-| `lib/api.ts`                           | shared API types and `isYamlConfig()` guard                                                                             |
-| `lib/commands.ts`                      | `velina init`, `config check`, `schema` implementations                                                                 |
-| `assets/velina.txt`                    | ASCII art, imported as text by `lib/banner.ts`                                                                          |
-| `lib/banner.ts`                        | startup banner, terminal/agent detection, clipboard fallback                                                            |
-| `lib/cli-args.ts`, `lib/cli-client.ts` | CLI argument parsing and client helpers                                                                                 |
-| `web/`                                 | Vite-free frontend built by Bun's HTML import                                                                           |
-| `lib/tests/fixtures/`                  | config fixtures for tests                                                                                               |
+| Path                                     | Purpose                                                                                                                 |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `velina.ts`                              | server entry and command dispatch (`init`, `config check`, `schema`, `--help`); default export is the Bun server object |
+| `velina-cli.ts`                          | CLI client for the API                                                                                                  |
+| `lib/config.ts`                          | Zod config schema, loading, resolution, `loadConfig()`                                                                  |
+| `lib/glob.ts`                            | wildcard key detection and env/task glob matching used by config resolution                                             |
+| `lib/velina.ts`                          | `Velina` process/log/metrics store (no Cap'n Web imports)                                                               |
+| `lib/metrics.ts`, `lib/metrics-linux.ts` | platform-neutral metric collector and Linux `/proc` source                                                              |
+| `lib/velina-rpc.ts`                      | `VelinaRpcTarget`, thin adapter over `Velina`                                                                           |
+| `lib/api.ts`                             | shared API types and `isYamlConfig()` guard                                                                             |
+| `lib/commands.ts`                        | `velina init`, `config check`, `schema` implementations                                                                 |
+| `assets/velina.txt`                      | ASCII art, imported as text by `lib/banner.ts`                                                                          |
+| `lib/banner.ts`                          | startup banner, terminal/agent detection, clipboard fallback                                                            |
+| `lib/cli-args.ts`, `lib/cli-client.ts`   | CLI argument parsing and client helpers                                                                                 |
+| `web/`                                   | Vite-free frontend built by Bun's HTML import                                                                           |
+| `lib/tests/fixtures/`                    | config fixtures for tests                                                                                               |
 
 ## Commands
 
@@ -53,6 +54,12 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 - `stopProcess` sends SIGTERM with a SIGKILL fallback after five seconds, is idempotent, and keeps logs. `deleteProcess` only works on stopped processes.
 - `startTaskGroup` starts members in order, skips already-running ones (returning their current process), and rolls back processes it started if a later member fails. `stopTaskGroup` stops running members in parallel. Both throw for unknown group names.
 
+### Metrics
+
+- `lib/metrics.ts` holds platform-neutral types, `MetricsCollector` (deltas, rates, process-tree aggregation), and `createMetricsSource()`. `lib/metrics-linux.ts` reads `/proc` through an injectable `ProcReader`; unsupported platforms use `nullMetricsSource`. Adding macOS or Windows means one new source plus one switch case.
+- `Velina` owns a one-second sampling timer and 600-sample ring buffers per process plus one for host network. Stop sampling in both `shutdown()` and `[Symbol.dispose]()` or tests will leak timers. `ProcessInfo` carries the latest sample; `getProcessMetrics(id)` and `getHostMetrics()` return history.
+- CPU percentage is per-core and can exceed 100%. Network rates are host-wide except loopback; Linux has no per-process network counters through `/proc`, so no attempt is made to instrument sockets.
+
 ### RPC and server
 
 - `VelinaRpcTarget extends RpcTarget`. Only prototype methods are reachable over RPC; keep state in `#private` fields and use `#private` helpers, not TypeScript `private`.
@@ -62,7 +69,7 @@ Always leave `bun test`, `tsc --noEmit`, `lint`, and `format:check` green. Integ
 
 ### CLI
 
-- One short subcommand per API method: `config`, `groups`, `start`, `start-group`, `ps`, `process`, `logs`, `stop`, `stop-group`, `delete`, plus `--help`.
+- One short subcommand per API method: `config`, `groups`, `start`, `start-group`, `ps`, `process`, `metrics`, `logs`, `stop`, `stop-group`, `delete`, plus `--help`.
 - All structured output is JSON; `logs` prints timestamped lines by default and JSONL with `--json`.
 - One WebSocket session per invocation, disposed on exit. Port comes from local `.velina.yml` unless `--port` is given. Process ids may be abbreviated to a unique prefix.
 - Exit codes: `0` success, `1` API/runtime error, `2` usage error.

@@ -2,8 +2,28 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Subprocess } from "bun";
 
-import type { LogEntry, LogType, ProcessInfo, TaskGroupInfo, VelinaApi, YamlConfig } from "./api";
+import type {
+  HostMetrics,
+  LogEntry,
+  LogType,
+  ProcessInfo,
+  ProcessMetrics,
+  TaskGroupInfo,
+  VelinaApi,
+  YamlConfig,
+} from "./api";
 import type { LoadedConfig, ResolvedConfig } from "./config";
+import {
+  createMetricsSource,
+  DEFAULT_METRICS_INTERVAL_MS,
+  MAX_METRIC_SAMPLES,
+  MetricsCollector,
+  type CollectorState,
+  type HostNetworkSample,
+  type HostState,
+  type MetricSample,
+  type MetricsSource,
+} from "./metrics";
 
 const MAX_LOG_ENTRIES = 5000;
 const STOP_TIMEOUT_MS = 5000;
@@ -24,11 +44,13 @@ interface ManagedProcess {
   logs: LogEntry[];
   subscribers: Set<LogSubscriber>;
   exit: Promise<void>;
+  metrics: MetricSample[];
+  metricState?: CollectorState;
 }
 
-function trimToLimit(entries: LogEntry[]): void {
-  if (entries.length > MAX_LOG_ENTRIES) {
-    entries.splice(0, entries.length - MAX_LOG_ENTRIES);
+function trimToLimit(entries: unknown[], max = MAX_LOG_ENTRIES): void {
+  if (entries.length > max) {
+    entries.splice(0, entries.length - max);
   }
 }
 
@@ -50,11 +72,26 @@ export class Velina implements VelinaApi {
   readonly #loaded: LoadedConfig;
   readonly #config: ResolvedConfig;
   readonly #processes = new Map<string, ManagedProcess>();
+  readonly #metricsCollector: MetricsCollector;
+  #metricTimer: ReturnType<typeof setInterval> | undefined;
+  #hostMetrics: HostNetworkSample[] = [];
+  #hostState: HostState | undefined;
 
-  constructor(loaded: LoadedConfig) {
+  constructor(
+    loaded: LoadedConfig,
+    opts: { metricsSource?: MetricsSource; metricsIntervalMs?: number } = {},
+  ) {
     this.#loaded = loaded;
     this.#config = loaded.resolved;
     this.#writeFiles(this.#config.files ?? []);
+
+    this.#metricsCollector = new MetricsCollector(opts.metricsSource ?? createMetricsSource());
+    if (this.#metricsCollector.supported) {
+      this.#metricTimer = setInterval(
+        () => void this.#sampleMetrics(),
+        opts.metricsIntervalMs ?? DEFAULT_METRICS_INTERVAL_MS,
+      );
+    }
   }
 
   getConfig(): LoadedConfig;
@@ -135,6 +172,7 @@ export class Velina implements VelinaApi {
       cmd: task.cmd,
       args: [...task.args],
       cwd: task.cwd,
+      metrics: null,
     };
 
     const managed: ManagedProcess = {
@@ -143,6 +181,7 @@ export class Velina implements VelinaApi {
       logs: [],
       subscribers: new Set(),
       exit: Promise.resolve(),
+      metrics: [],
     };
 
     const subprocess = Bun.spawn({
@@ -177,6 +216,24 @@ export class Velina implements VelinaApi {
 
   getProcess(id: string): ProcessInfo {
     return this.#snapshot(this.#get(id));
+  }
+
+  getProcessMetrics(id: string): ProcessMetrics {
+    const managed = this.#get(id);
+    return {
+      processId: id,
+      supported: this.#metricsCollector.supported,
+      latest: managed.metrics.at(-1) ?? null,
+      samples: [...managed.metrics],
+    };
+  }
+
+  getHostMetrics(): HostMetrics {
+    return {
+      supported: this.#metricsCollector.supported,
+      latest: this.#hostMetrics.at(-1) ?? null,
+      samples: [...this.#hostMetrics],
+    };
   }
 
   streamProcessLogs(id: string, type: LogType): ReadableStream<LogEntry> {
@@ -215,6 +272,7 @@ export class Velina implements VelinaApi {
   }
 
   async shutdown(): Promise<void> {
+    this.#stopSampling();
     await Promise.all([...this.#processes.values()].map((managed) => this.#terminate(managed)));
   }
 
@@ -229,6 +287,7 @@ export class Velina implements VelinaApi {
   }
 
   [Symbol.dispose](): void {
+    this.#stopSampling();
     for (const managed of this.#processes.values()) {
       if (managed.info.state === "running") {
         managed.subprocess?.kill("SIGTERM");
@@ -251,6 +310,38 @@ export class Velina implements VelinaApi {
       await managed.exit;
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  #stopSampling(): void {
+    if (!this.#metricTimer) return;
+    clearInterval(this.#metricTimer);
+    this.#metricTimer = undefined;
+  }
+
+  async #sampleMetrics(): Promise<void> {
+    try {
+      const now = Date.now();
+      for (const managed of this.#processes.values()) {
+        if (managed.info.state !== "running" || !managed.subprocess?.pid) continue;
+
+        const pid = managed.subprocess.pid;
+        const result = await this.#metricsCollector.collect(pid, managed.metricState, now);
+        if (!result) continue;
+
+        managed.metricState = result.state;
+        managed.metrics.push(result.sample);
+        trimToLimit(managed.metrics, MAX_METRIC_SAMPLES);
+      }
+
+      const host = await this.#metricsCollector.collectHost(this.#hostState, now);
+      if (host) {
+        this.#hostState = host.state;
+        this.#hostMetrics.push(host.sample);
+        trimToLimit(this.#hostMetrics, MAX_METRIC_SAMPLES);
+      }
+    } catch (error) {
+      console.error("Failed to collect process metrics:", error);
     }
   }
 
@@ -283,7 +374,11 @@ export class Velina implements VelinaApi {
   }
 
   #snapshot(managed: ManagedProcess): ProcessInfo {
-    return { ...managed.info, args: [...managed.info.args] };
+    return {
+      ...managed.info,
+      args: [...managed.info.args],
+      metrics: managed.metrics.at(-1) ?? null,
+    };
   }
 
   #appendLog(managed: ManagedProcess, type: LogType, line: string): void {

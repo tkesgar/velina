@@ -1,4 +1,5 @@
 import type { LoadedConfig } from "./config";
+import type { HostNetworkSample, MetricSample } from "./metrics";
 
 export type LogType = "stdout" | "stderr";
 
@@ -20,6 +21,20 @@ export interface ProcessInfo {
   cmd: string;
   args: string[];
   cwd: string;
+  metrics: MetricSample | null;
+}
+
+export interface ProcessMetrics {
+  processId: string;
+  supported: boolean;
+  latest: MetricSample | null;
+  samples: MetricSample[];
+}
+
+export interface HostMetrics {
+  supported: boolean;
+  latest: HostNetworkSample | null;
+  samples: HostNetworkSample[];
 }
 
 export interface TaskGroupInfo {
@@ -45,6 +60,8 @@ export interface VelinaApi {
   startTaskGroup(name: string): Promise<ProcessInfo[]>;
   getAllProcesses(): ProcessInfo[];
   getProcess(id: string): ProcessInfo;
+  getProcessMetrics(id: string): ProcessMetrics;
+  getHostMetrics(): HostMetrics;
   streamProcessLogs(id: string, type: LogType): ReadableStream<LogEntry>;
   stopProcess(id: string): Promise<ProcessInfo>;
   stopTaskGroup(name: string): Promise<ProcessInfo[]>;

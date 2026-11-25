@@ -16,6 +16,7 @@ function processInfo(id: string, taskName = "greet"): ProcessInfo {
     cmd: "bun",
     args: [],
     cwd: "/tmp",
+    metrics: null,
   };
 }
 

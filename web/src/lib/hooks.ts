@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import {
   isYamlConfig,
+  type HostMetrics,
   type LogEntry,
   type LogType,
   type ProcessInfo,
+  type ProcessMetrics,
   type YamlConfig,
 } from "../../../lib/api";
 import type { LoadedConfig } from "../../../lib/config";
@@ -12,6 +14,7 @@ import { useVelina } from "./velina-context";
 
 const MAX_DISPLAYED_LINES = 1000;
 const POLL_INTERVAL_MS = 1000;
+const METRICS_POLL_INTERVAL_MS = 1000;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -145,4 +148,68 @@ export function useProcessLogs(id: string | null, type: LogType) {
   }, [api, id, type]);
 
   return { lines, error };
+}
+
+export function useProcessMetrics(id: string | null) {
+  const { api } = useVelina();
+  const [metrics, setMetrics] = useState<ProcessMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMetrics(null);
+    setError(null);
+    if (!id) return;
+
+    let active = true;
+    const refresh = async () => {
+      try {
+        const next = await Promise.resolve(api.getProcessMetrics(id));
+        if (active) {
+          setMetrics(next);
+          setError(null);
+        }
+      } catch (cause) {
+        if (active) setError(errorMessage(cause));
+      }
+    };
+
+    void refresh();
+    const timer = setInterval(() => void refresh(), METRICS_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [api, id]);
+
+  return { metrics, error };
+}
+
+export function useHostMetrics() {
+  const { api } = useVelina();
+  const [metrics, setMetrics] = useState<HostMetrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = async () => {
+      try {
+        const next = await Promise.resolve(api.getHostMetrics());
+        if (active) {
+          setMetrics(next);
+          setError(null);
+        }
+      } catch (cause) {
+        if (active) setError(errorMessage(cause));
+      }
+    };
+
+    void refresh();
+    const timer = setInterval(() => void refresh(), METRICS_POLL_INTERVAL_MS);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [api]);
+
+  return { metrics, error };
 }

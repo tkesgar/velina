@@ -35,6 +35,11 @@ describe("parseCliArgs", () => {
       json: false,
       target: "services-dev",
     });
+    expect(parseCliArgs(["metrics", "abc123"])).toEqual({
+      command: "metrics",
+      json: false,
+      target: "abc123",
+    });
   });
 
   it("should parse logs with an optional type", () => {
@@ -70,6 +75,7 @@ describe("parseCliArgs", () => {
     expect(() => parseCliArgs(["start"])).toThrow("Missing argument");
     expect(() => parseCliArgs(["start-group"])).toThrow("Missing argument");
     expect(() => parseCliArgs(["stop-group"])).toThrow("Missing argument");
+    expect(() => parseCliArgs(["metrics"])).toThrow("Missing argument");
     expect(() => parseCliArgs(["logs"])).toThrow("Missing process id");
   });
 

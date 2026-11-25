@@ -13,6 +13,7 @@ const USAGE = `Usage:
   velina-cli start-group <group>          start every task in a group
   velina-cli ps                           list all processes
   velina-cli process <id>                 show process details
+  velina-cli metrics <id>                 show process metrics history
   velina-cli logs <id> [stdout|stderr]    stream process logs
   velina-cli stop <id>                    stop a process
   velina-cli stop-group <group>           stop running tasks in a group
@@ -55,6 +56,11 @@ async function run(args: CliArgs, api: RpcStub<VelinaApi>): Promise<void> {
     case "process": {
       const id = await resolveProcessId(api, args.target!);
       printJson(await Promise.resolve(api.getProcess(id)));
+      return;
+    }
+    case "metrics": {
+      const id = await resolveProcessId(api, args.target!);
+      printJson(await Promise.resolve(api.getProcessMetrics(id)));
       return;
     }
     case "logs": {

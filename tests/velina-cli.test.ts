@@ -198,6 +198,10 @@ describe("velina-cli", () => {
     const process = JSON.parse(started.stdout) as ProcessInfo;
     expect(process.state).toBe("running");
 
+    const metrics = cli("metrics", process.id.slice(0, 8));
+    expect(metrics.exitCode).toBe(0);
+    expect(JSON.parse(metrics.stdout).processId).toBe(process.id);
+
     const all = cli("ps");
     expect(all.exitCode).toBe(0);
     expect((JSON.parse(all.stdout) as ProcessInfo[]).map((p) => p.id)).toContain(process.id);

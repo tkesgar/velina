@@ -10,6 +10,7 @@ export type CliCommand =
   | "start-group"
   | "ps"
   | "process"
+  | "metrics"
   | "logs"
   | "stop"
   | "stop-group"
@@ -31,6 +32,7 @@ const commands: CliCommand[] = [
   "start-group",
   "ps",
   "process",
+  "metrics",
   "logs",
   "stop",
   "stop-group",
@@ -90,6 +92,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     case "start":
     case "start-group":
     case "process":
+    case "metrics":
     case "stop":
     case "stop-group":
     case "delete":

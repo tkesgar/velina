@@ -6,11 +6,20 @@ import { useSearchParams } from "react-router";
 import type { LogType, ProcessInfo } from "../../../lib/api";
 import { ConfigView } from "../components/config-view";
 import { LogViewer } from "../components/log-viewer";
-import { useProcessLogs, useProcesses } from "../lib/hooks";
+import { Sparkline } from "../components/sparkline";
+import { useHostMetrics, useProcessLogs, useProcessMetrics, useProcesses } from "../lib/hooks";
 import { useVelina } from "../lib/velina-context";
 
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function formatBytes(value: number | null): string {
+  if (value === null) return "—";
+  if (value < 1024) return `${Math.round(value)} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 ** 3) return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`;
 }
 
 export function ProcessesPage() {
@@ -23,6 +32,8 @@ export function ProcessesPage() {
   const requestedId = searchParams.get("process");
   const selected = processes.find((process) => process.id === requestedId) ?? processes[0];
   const { lines, error: logError } = useProcessLogs(selected?.id ?? null, logType);
+  const { metrics, error: metricsError } = useProcessMetrics(selected?.id ?? null);
+  const { metrics: hostMetrics } = useHostMetrics();
 
   async function run(action: () => Promise<unknown>) {
     try {
@@ -159,6 +170,69 @@ export function ProcessesPage() {
                 {selected.taskName}
               </Heading>
               <ConfigView value={selected} />
+
+              <Heading size="sm" mt="4" mb="2">
+                Metrics
+              </Heading>
+              {metricsError ? (
+                <Text color="fg.error" mb="4">
+                  {metricsError}
+                </Text>
+              ) : metrics?.latest ? (
+                <Box mb="4">
+                  <HStack gap="4" wrap="wrap" mb="3">
+                    <Text>
+                      CPU:{" "}
+                      {metrics.latest.cpuPercent === null
+                        ? "—"
+                        : `${metrics.latest.cpuPercent.toFixed(1)}%`}
+                    </Text>
+                    <Text>Memory: {formatBytes(metrics.latest.memoryBytes)}</Text>
+                    <Text>Threads: {metrics.latest.threads ?? "—"}</Text>
+                    <Text>FDs: {metrics.latest.openFiles ?? "—"}</Text>
+                    <Text>Children: {metrics.latest.childProcesses}</Text>
+                  </HStack>
+                  <Flex gap="4" wrap="wrap">
+                    <Sparkline
+                      label="CPU %"
+                      value={
+                        metrics.latest.cpuPercent === null
+                          ? "—"
+                          : `${metrics.latest.cpuPercent.toFixed(1)}%`
+                      }
+                      values={metrics.samples.map((sample) => sample.cpuPercent ?? 0)}
+                    />
+                    <Sparkline
+                      label="Memory"
+                      value={formatBytes(metrics.latest.memoryBytes)}
+                      values={metrics.samples.map((sample) => sample.memoryBytes)}
+                    />
+                    <Sparkline
+                      label="Disk read/s"
+                      value={formatBytes(metrics.latest.diskReadBytesPerSecond)}
+                      values={metrics.samples.map((sample) => sample.diskReadBytesPerSecond ?? 0)}
+                    />
+                    <Sparkline
+                      label="Disk write/s"
+                      value={formatBytes(metrics.latest.diskWriteBytesPerSecond)}
+                      values={metrics.samples.map((sample) => sample.diskWriteBytesPerSecond ?? 0)}
+                    />
+                  </Flex>
+                  {hostMetrics?.latest && (
+                    <Text mt="3" fontSize="xs" color="fg.muted">
+                      Host network (all interfaces except loopback): ↓{" "}
+                      {formatBytes(hostMetrics.latest.rxBytesPerSecond)}/s ↑{" "}
+                      {formatBytes(hostMetrics.latest.txBytesPerSecond)}/s
+                    </Text>
+                  )}
+                </Box>
+              ) : (
+                <Text color="fg.muted" mb="4">
+                  {metrics?.supported === false
+                    ? "Metrics are unavailable on this platform."
+                    : "Collecting metrics…"}
+                </Text>
+              )}
 
               <Heading size="sm" mt="4" mb="2" display="flex" alignItems="center" gap="2">
                 <FiTerminal aria-hidden="true" />
