@@ -10,6 +10,7 @@ import {
   resolveEnv,
   resolveValue,
   resolveVars,
+  zConfig,
 } from "./config";
 
 const fixturesDir = path.join(import.meta.dir, "tests/fixtures");
@@ -601,6 +602,165 @@ describe("config", () => {
         expect(resolved.tasks.build.cwd).toBe(path.join(rootDir, "packages/frontend"));
       });
 
+      describe("multiple cwd", () => {
+        const cwdRoot = path.join(fixturesDir, "empty");
+        const generatedTask = (cwd: string) => ({
+          cmd: "echo",
+          args: [],
+          cwd,
+          env: {},
+          files: [],
+        });
+
+        it("should keep the task name for a single cwd", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: { dev: { cmd: "echo", cwd: "./apps/alpha" } },
+          });
+
+          expect(resolved.tasks).toEqual({
+            dev: generatedTask(path.join(cwdRoot, "apps/alpha")),
+          });
+        });
+
+        it("should prefix array entries with the cwd basename", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              dev: { cmd: "echo", cwd: ["./apps/alpha/baz", "./packages/beta/qux"] },
+            },
+          });
+
+          expect(resolved.tasks).toEqual({
+            "baz:dev": generatedTask(path.join(cwdRoot, "apps/alpha/baz")),
+            "qux:dev": generatedTask(path.join(cwdRoot, "packages/beta/qux")),
+          });
+        });
+
+        it("should number colliding prefixes in generation order", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              dev: { cmd: "echo", cwd: ["./a/baz", "./b/baz", "./c/baz", "./d/baz"] },
+            },
+          });
+
+          expect(Object.keys(resolved.tasks)).toEqual([
+            "baz:dev",
+            "baz-2:dev",
+            "baz-3:dev",
+            "baz-4:dev",
+          ]);
+          expect(resolved.tasks["baz-3:dev"].cwd).toBe(path.join(cwdRoot, "c/baz"));
+        });
+
+        it("should number full names independently across task definitions", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              dev: { cmd: "echo", cwd: ["./a/baz", "./b/baz"] },
+              build: { cmd: "echo", cwd: ["./c/baz", "./d/baz"] },
+            },
+          });
+
+          expect(Object.keys(resolved.tasks)).toEqual([
+            "baz:dev",
+            "baz-2:dev",
+            "baz:build",
+            "baz-2:build",
+          ]);
+        });
+
+        it("should use record keys as prefixes", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              lint: {
+                cmd: "echo",
+                cwd: { frontend: "./apps/frontend", backend: "./apps/backend" },
+              },
+            },
+          });
+
+          expect(resolved.tasks).toEqual({
+            "frontend:lint": generatedTask(path.join(cwdRoot, "apps/frontend")),
+            "backend:lint": generatedTask(path.join(cwdRoot, "apps/backend")),
+          });
+        });
+
+        it("should avoid clobbering an existing task name", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              "baz:dev": { cmd: "echo", args: ["hand-written"] },
+              dev: { cmd: "echo", cwd: ["./a/baz", "./b/baz"] },
+            },
+          });
+
+          expect(Object.keys(resolved.tasks)).toEqual(["baz:dev", "baz-2:dev", "baz-3:dev"]);
+          expect(resolved.tasks["baz:dev"].args).toEqual(["hand-written"]);
+        });
+
+        it("should let a later glob delete generated tasks", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              dev: { cmd: "echo", cwd: ["./a/baz", "./b/qux"] },
+              "baz:*": null,
+            },
+          });
+
+          expect(resolved.tasks).toEqual({
+            "qux:dev": generatedTask(path.join(cwdRoot, "b/qux")),
+          });
+        });
+
+        it("should reuse a name freed by glob deletion", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            tasks: {
+              "baz:dev": { cmd: "echo", args: ["hand-written"] },
+              "baz:*": null,
+              dev: { cmd: "echo", cwd: ["./a/baz", "./b/baz"] },
+            },
+          });
+
+          expect(Object.keys(resolved.tasks)).toEqual(["baz:dev", "baz-2:dev"]);
+          expect(resolved.tasks["baz:dev"].args).toEqual([]);
+        });
+
+        it("should share resolved env and files across generated tasks", async () => {
+          const resolved = await resolveConfig({
+            rootDir: cwdRoot,
+            inheritEnv: false,
+            vars: { NAME: { type: "value", value: "Vivian" } },
+            tasks: {
+              greet: {
+                cmd: "echo",
+                cwd: ["./a/baz", "./b/baz"],
+                env: { MESSAGE: "Hi, <%= vars.NAME %>!" },
+                files: [{ path: "greeting.txt", content: { type: "value", value: "hello" } }],
+              },
+            },
+          });
+
+          for (const name of ["baz:greet", "baz-2:greet"]) {
+            expect(resolved.tasks[name].env).toEqual({ MESSAGE: "Hi, Vivian!" });
+            expect(resolved.tasks[name].files).toEqual([
+              { path: path.join(cwdRoot, "greeting.txt"), content: "hello" },
+            ]);
+          }
+        });
+      });
+
       it("should resolve env and files for config tasks", async () => {
         const rootDir = path.join(fixturesDir, "empty");
         const resolved = await resolveConfig({
@@ -657,5 +817,25 @@ describe("config", () => {
       expect(loaded.resolved.vars).toEqual({});
       expect(loaded.resolved.files).toEqual([]);
     });
+  });
+});
+
+describe("task cwd schema", () => {
+  const parse = (cwd: unknown) => zConfig.safeParse({ tasks: { dev: { cmd: "echo", cwd } } });
+
+  it("should accept string, array, and record cwd", () => {
+    expect(parse("./apps/frontend").success).toBe(true);
+    expect(parse(["./apps/frontend", "./apps/backend"]).success).toBe(true);
+    expect(parse({ frontend: "./apps/frontend" }).success).toBe(true);
+  });
+
+  it("should reject empty arrays and records", () => {
+    expect(parse([]).success).toBe(false);
+    expect(parse({}).success).toBe(false);
+  });
+
+  it("should reject malformed entries", () => {
+    expect(parse([1]).success).toBe(false);
+    expect(parse({ frontend: 1 }).success).toBe(false);
   });
 });

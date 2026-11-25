@@ -59,6 +59,14 @@ const zConfigEnv = z
   })
   .describe("Environment values; wildcard keys delete matching variables.");
 
+const zConfigTaskCwd = z.union([
+  z.string(),
+  z.array(z.string()).min(1, "cwd must have at least one entry"),
+  z
+    .record(z.string(), z.string())
+    .refine((cwd) => Object.keys(cwd).length > 0, "cwd must have at least one entry"),
+]);
+
 const zConfigTasks = z
   .record(
     z.string(),
@@ -66,7 +74,7 @@ const zConfigTasks = z
       .object({
         cmd: z.string(),
         args: z.array(z.string()).optional(),
-        cwd: z.string().optional(),
+        cwd: zConfigTaskCwd.optional(),
         env: zConfigEnv.optional(),
         files: z.array(zConfigFileEntry).optional(),
       })
@@ -354,6 +362,54 @@ export interface ResolvedConfig {
   >;
 }
 
+// === expand task cwd
+
+type ConfigTask = NonNullable<NonNullable<Config["tasks"]>[string]>;
+type ConfigTaskCwd = ConfigTask["cwd"];
+
+interface TaskCwdEntry {
+  prefix: string;
+  cwd: string;
+}
+
+// A single cwd keeps the task name as-is. Multiple cwds get a prefix so that
+// each generated task has a distinct name.
+function taskCwdEntries(cwd: ConfigTaskCwd, rootDir: string): TaskCwdEntry[] {
+  if (cwd === undefined) {
+    return [{ prefix: "", cwd: rootDir }];
+  }
+
+  if (typeof cwd === "string") {
+    return [{ prefix: "", cwd: path.resolve(rootDir, cwd) }];
+  }
+
+  const entries = Array.isArray(cwd)
+    ? cwd.map((value) => ({ prefix: undefined, value }))
+    : Object.entries(cwd).map(([prefix, value]) => ({ prefix, value }));
+
+  return entries.map(({ prefix, value }) => {
+    const resolved = path.resolve(rootDir, value);
+    return {
+      prefix: prefix ?? (path.basename(resolved) || resolved),
+      cwd: resolved,
+    };
+  });
+}
+
+// Numbering is keyed by the full name, so `baz:dev` and `baz:build` do not
+// compete. Names already in the map are never clobbered by a generated task.
+function claimTaskName(prefix: string, name: string, tasks: ResolvedConfig["tasks"]): string {
+  if (!prefix) return name;
+
+  let claimed = `${prefix}:${name}`;
+  let index = 1;
+  while (Object.hasOwn(tasks, claimed)) {
+    index += 1;
+    claimed = `${prefix}-${index}:${name}`;
+  }
+  return claimed;
+}
+
 export async function resolveConfig(
   config: Config,
   opts: {
@@ -407,13 +463,19 @@ export async function resolveConfig(
     if (task === null) {
       delete tasks[key];
     } else {
-      tasks[key] = {
-        cmd: task.cmd,
-        args: task.args ?? [],
-        cwd: path.resolve(rootDir, task.cwd ?? "."),
-        env: resolveEnv({ vars }, task.env ?? {}, { parentEnv: env }),
-        files: resolveFiles({ cwd: rootDir, vars, env }, task.files ?? []),
-      };
+      const args = task.args ?? [];
+      const resolvedEnv = resolveEnv({ vars }, task.env ?? {}, { parentEnv: env });
+      const resolvedFiles = resolveFiles({ cwd: rootDir, vars, env }, task.files ?? []);
+
+      for (const { prefix, cwd } of taskCwdEntries(task.cwd, rootDir)) {
+        tasks[claimTaskName(prefix, key, tasks)] = {
+          cmd: task.cmd,
+          args: [...args],
+          cwd,
+          env: { ...resolvedEnv },
+          files: resolvedFiles.map((file) => ({ ...file })),
+        };
+      }
     }
   }
 

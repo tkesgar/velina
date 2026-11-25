@@ -162,7 +162,8 @@ tasks:
   norma:start:
     cmd: npm
     args: [start]
-    # Resolved against rootDir.
+    # Resolved against rootDir. May also be a list of paths or a map of
+    # prefix -> path to generate several tasks. See "Task cwd" below.
     cwd: ./apps/norma
     env:
       NODE_ENV: development
@@ -199,6 +200,35 @@ Within `env` entries, `env` refers to the inherited environment; within files, i
 - Workspace patterns beginning with `!` exclude matching packages. Only the array form of `workspaces` is supported.
 - Scanned tasks inherit the resolved root `env` (including `PATH` when `inheritEnv` is true) and have empty `files`.
 - Tasks defined in the config override scanned tasks of the same name; a `null` entry removes one.
+
+### Task cwd
+
+A task `cwd` takes one of three forms. Paths are resolved against `rootDir` and used as plain strings; templates are not applied to them.
+
+- A **string** produces one task under the configured name.
+- An **array** produces one task per path. Each name is prefixed with the basename of its `cwd`, so `/foo/bar/baz` gives `baz:<name>`. When several paths share a basename, later tasks get a numeric suffix on the prefix: `baz:dev`, `baz-2:dev`, `baz-3:dev`. Numbering follows the full name, so `baz:build` and `baz-2:build` are independent of the `dev` series.
+- A **record** produces one task per entry, with the key as the prefix and the value as the path: `{ frontend: ./apps/frontend }` gives `frontend:<name>`.
+
+Empty arrays and records are rejected. Generated tasks share the definition's `cmd`, `args`, `env`, and `files` (the `files` paths still resolve against `rootDir`). A generated name never displaces an existing task; if it collides, the prefix is numbered instead. An explicit task declared later still overrides by name, as with scanned tasks.
+
+```yaml
+tasks:
+  serve:
+    cmd: bun
+    args: [run, serve]
+    cwd:
+      - ./apps/alpha/baz
+      - ./apps/beta/baz
+      # -> baz:serve, baz-2:serve
+
+  lint:
+    cmd: bun
+    args: [run, lint]
+    cwd:
+      frontend: ./apps/frontend
+      backend: ./apps/backend
+      # -> frontend:lint, backend:lint
+```
 
 ### Glob deletion
 
