@@ -104,7 +104,7 @@ velina
 
 With `--agent-doc`, it also appends a short Velina pointer to `AGENTS.md` — but only if that file already exists. The pointer is idempotent: running `init` again replaces the marked section instead of duplicating it. Existing `AGENTS.md` content is otherwise preserved.
 
-Use `--json` for a machine-readable result with the created config path, added scripts, and whether the agent pointer was added, updated, or skipped. Agents can use `velina schema` to see the accepted config fields and `velina config check` to validate before starting the server.
+Use `--json` for a machine-readable result with the created config path, added scripts, whether the agent pointer was added, updated, or skipped, and whether a log-ignore entry was added. `init` also adds `.velina/logs/` to `.gitignore`, creating the file if needed and leaving existing entries intact. Agents can use `velina schema` to see the accepted config fields and `velina config check` to validate before starting the server.
 
 ## Configuration
 
@@ -123,6 +123,12 @@ rootDir: .
 # Package manager used for scanned tasks (for example bun, npm, pnpm).
 # Default: bun
 packageManager: bun
+# Persist separate stdout and stderr files for finished processes.
+# The directory resolves against rootDir.
+# Defaults: enabled true, dir .velina/logs
+logs:
+  enabled: true
+  dir: .velina/logs
 # Variables made available to templates.
 vars:
   VAR1: foo
@@ -179,6 +185,12 @@ taskGroup:
 ```
 
 Unknown keys are rejected. A missing `.velina.yml` or an empty one is treated as an empty configuration; an explicitly provided config path that does not exist is an error.
+
+### Log persistence
+
+When `logs.enabled` is true, Velina streams each process's stdout and stderr into separate files under `logs.dir`. Final files are named `<task>-<uid>.out.log` and `<task>-<uid>.err.log` — for example, `benchmark-sample-a1b2c3d4.out.log`. The task name has path separators and other special characters replaced with `-`, and the uid is the first eight characters of the process id, extended if a name is already taken. Files appear only when the process finishes; while it runs, output goes to `.part` files that are renamed on completion. Stale `.part` files are removed at startup. Both files are written even when a stream is empty, and persisted files are not capped by the 5,000-line in-memory buffer used for live streaming.
+
+The exact paths are exposed as `logFiles` on finished process details, including `bench` results, so agents do not need to construct file names. Deleting a process record does not delete its log files. Build output can contain secrets, so keep the log directory ignored — `velina init` adds `.velina/logs/` to `.gitignore` automatically when persistence is left at its default location. Set `logs.enabled: false` to disable persistence entirely.
 
 ### Resolvable values
 
@@ -329,7 +341,7 @@ api.deleteProcess(process.id);
 | `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                                                       |
 | `deleteProcesses(opts)`       | Removes every stopped process matching `label` and/or `taskName`, returning the count. At least one filter is required; running matches are skipped.                 |
 
-A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, `cwd`, and `metrics` (the latest sample, or `null`). It may also carry a `label` and a `kind` (`run`, `pre-hook`, or `post-hook`). Once stopped, it has `durationMs`, the wall-clock time from just before spawn to after log collection. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
+A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, `cwd`, and `metrics` (the latest sample, or `null`). It may also carry a `label` and a `kind` (`run`, `pre-hook`, or `post-hook`). Once stopped, it has `durationMs`, the wall-clock time from just before spawn to after log collection, and `logFiles` with absolute `stdout` and `stderr` paths when persistence succeeded. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
 
 ### Metrics
 
@@ -385,4 +397,4 @@ Options:
 
 The command prints one JSON object: `runs` with each process `id`, `label`, `kind`, `durationMs`, and `exitCode`; and a `summary` with `minSeconds`, `maxSeconds`, `meanSeconds`, `medianSeconds`, and `p95Seconds`. Failed runs are recorded, but the loop stops there. A failed run or hook still prints the JSON, adds an `error` field, and exits with code `1`. On SIGINT, the active process is stopped and the collected results are printed.
 
-Benchmarking is designed for relatively long tasks (roughly > 100 ms), where process-spawn overhead is negligible. For measuring short pieces of code, use a dedicated test harness instead. Standard output is buffered in memory, so use `velina-cli logs <id>` to inspect a failed run; file-backed log persistence is not implemented yet.
+Benchmarking is designed for relatively long tasks (roughly > 100 ms), where process-spawn overhead is negligible. For measuring short pieces of code, use a dedicated test harness instead. Each run's `logFiles` field points to its persisted stdout and stderr; use those paths (or `velina-cli logs <id>` for the in-memory buffer) to inspect a failed run.

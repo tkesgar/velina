@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 import type { Subprocess } from "bun";
@@ -74,6 +74,7 @@ beforeAll(async () => {
     path.join(tempDir, "velina.json"),
     JSON.stringify({
       port,
+      logs: { enabled: true, dir: path.join(tempDir, "logs") },
       tasks: {
         greet: {
           cmd: process.execPath,
@@ -321,6 +322,9 @@ describe("velina-cli", () => {
     expect(report.summary.meanSeconds).toBeGreaterThanOrEqual(0);
     expect(report.summary.p95Seconds).toBeGreaterThanOrEqual(0);
     expect(report.error).toBeUndefined();
+    expect(report.runs[0].logFiles.stdout).toContain(path.join(tempDir, "logs"));
+    expect(existsSync(report.runs[0].logFiles.stdout)).toBe(true);
+    expect(existsSync(report.runs[0].logFiles.stderr)).toBe(true);
 
     const all = cli("ps", "--label", "bench-test");
     expect(JSON.parse(all.stdout)).toHaveLength(6);

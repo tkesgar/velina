@@ -80,6 +80,29 @@ describe("initProject", () => {
     expect(result.agentDoc).toBe("skipped");
     expect(existsSync(path.join(cwd, "AGENTS.md"))).toBe(false);
   });
+
+  it("should add the log ignore entry once and preserve existing content", async () => {
+    const cwd = makeDir();
+    const ignorePath = path.join(cwd, ".gitignore");
+    writeFileSync(ignorePath, "node_modules/\n");
+
+    const first = await initProject({ cwd });
+    expect(first.gitignoreUpdated).toBe(true);
+    expect(readFileSync(ignorePath, "utf8")).toBe("node_modules/\n.velina/logs/\n");
+
+    const second = await initProject({ cwd });
+    expect(second.gitignoreUpdated).toBe(false);
+    expect(readFileSync(ignorePath, "utf8")).toBe("node_modules/\n.velina/logs/\n");
+  });
+
+  it("should create a gitignore when none exists", async () => {
+    const cwd = makeDir();
+
+    const result = await initProject({ cwd });
+
+    expect(result.gitignoreUpdated).toBe(true);
+    expect(readFileSync(path.join(cwd, ".gitignore"), "utf8")).toBe(".velina/logs/\n");
+  });
 });
 
 describe("getConfigSchema", () => {
@@ -93,6 +116,7 @@ describe("getConfigSchema", () => {
     expect(schema.type).toBe("object");
     expect(schema.properties.port.minimum).toBe(1);
     expect(schema.properties.port.maximum).toBe(65535);
+    expect(schema.properties.logs).toBeDefined();
     expect(schema.additionalProperties).toBe(false);
   });
 });

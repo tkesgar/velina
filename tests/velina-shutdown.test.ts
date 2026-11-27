@@ -62,6 +62,7 @@ beforeAll(async () => {
     path.join(tempDir, "velina.json"),
     JSON.stringify({
       port,
+      logs: { enabled: false },
       tasks: {
         sleeper: {
           cmd: process.execPath,

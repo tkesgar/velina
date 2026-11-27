@@ -3,6 +3,10 @@
 # task groups. Run `bun velina-cli.ts config --format yaml` to see the result.
 
 port: 2222
+# Finished processes keep separate stdout and stderr files here.
+logs:
+  enabled: true
+  dir: .velina/logs
 inheritEnv: true
 rootDir: .
 packageManager: bun

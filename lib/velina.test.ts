@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
@@ -27,7 +27,15 @@ function configWith(
 ): LoadedConfig {
   return {
     provided: {},
-    resolved: { port: 2222, vars: {}, env: {}, files, tasks, taskGroup },
+    resolved: {
+      logs: { enabled: false, dir: "/tmp/velina-test-logs" },
+      port: 2222,
+      vars: {},
+      env: {},
+      files,
+      tasks,
+      taskGroup,
+    },
   };
 }
 
@@ -87,7 +95,15 @@ describe("Velina", () => {
     it("should return the config as YAML when requested", () => {
       const velina = createVelina({
         provided: { port: 1234, vars: { GREETING: "hello" } },
-        resolved: { port: 1234, vars: {}, env: {}, files: [], tasks: {}, taskGroup: {} },
+        resolved: {
+          logs: { enabled: false, dir: "/tmp/velina-test-logs" },
+          port: 1234,
+          vars: {},
+          env: {},
+          files: [],
+          tasks: {},
+          taskGroup: {},
+        },
       });
 
       const yaml = velina.getConfig({ format: "yaml" });
@@ -507,6 +523,87 @@ describe("Velina", () => {
       await velina.stopProcess(running.id);
       expect(velina.deleteProcesses({ taskName: "loop" })).toBe(1);
       expect(velina.getAllProcesses()).toEqual([]);
+    });
+  });
+
+  describe("log persistence", () => {
+    const tempLogs = (): string => {
+      const dir = mkdtempSync(path.join(tmpdir(), "velina-logs-"));
+      tempDirs.push(dir);
+      return dir;
+    };
+
+    function withLogs(tasks: ResolvedConfig["tasks"], dir: string, enabled = true): LoadedConfig {
+      const base = configWith(tasks);
+      return { ...base, resolved: { ...base.resolved, logs: { enabled, dir } } };
+    }
+
+    it("should write separate stdout and stderr files for a finished process", async () => {
+      const dir = tempLogs();
+      const velina = createVelina(
+        withLogs({ greet: evalTask("console.log('out'); console.error('err')") }, dir),
+      );
+
+      const running = velina.startTask("greet");
+      expect(readdirSync(dir)).toEqual([]);
+
+      const finished = await velina.waitForProcess(running.id);
+
+      expect(finished.logFiles?.stdout).toMatch(/^.*[/\\]greet-[0-9a-f]{8}\.out\.log$/);
+      expect(finished.logFiles?.stderr).toMatch(/^.*[/\\]greet-[0-9a-f]{8}\.err\.log$/);
+      expect(readFileSync(finished.logFiles!.stdout, "utf8").trim()).toBe("out");
+      expect(readFileSync(finished.logFiles!.stderr, "utf8").trim()).toBe("err");
+      expect(readdirSync(dir).some((entry) => entry.endsWith(".part"))).toBe(false);
+    });
+
+    it("should normalize task names in log file names", async () => {
+      const dir = tempLogs();
+      const velina = createVelina(
+        withLogs({ "apps/frontend:build": evalTask("console.log('ok')") }, dir),
+      );
+
+      const finished = await velina.waitForProcess(velina.startTask("apps/frontend:build").id);
+
+      expect(path.basename(finished.logFiles!.stdout)).toMatch(
+        /^apps-frontend-build-[0-9a-f]{8}\.out\.log$/,
+      );
+      expect(path.basename(finished.logFiles!.stderr)).toMatch(
+        /^apps-frontend-build-[0-9a-f]{8}\.err\.log$/,
+      );
+    });
+
+    it("should write nothing when persistence is disabled", async () => {
+      const dir = tempLogs();
+      const velina = createVelina(withLogs({ greet: evalTask("console.log('out')") }, dir, false));
+
+      const process = velina.startTask("greet");
+      const finished = await velina.waitForProcess(process.id);
+
+      expect(readdirSync(dir)).toEqual([]);
+      expect(finished.logFiles).toBeUndefined();
+    });
+
+    it("should persist more lines than the in-memory buffer keeps", async () => {
+      const dir = tempLogs();
+      const source = "for (let i = 0; i < 6000; i++) console.log('line ' + i)";
+      const velina = createVelina(withLogs({ many: evalTask(source) }, dir));
+
+      const process = velina.startTask("many");
+      const finished = await velina.waitForProcess(process.id);
+      const lines = readFileSync(finished.logFiles!.stdout, "utf8").trimEnd().split("\n");
+
+      expect(lines).toHaveLength(6000);
+      expect(lines.at(-1)).toBe("line 5999");
+      expect(await collect(velina.streamProcessLogs(process.id, "stdout"))).toHaveLength(5000);
+    });
+
+    it("should remove stale partial files at startup", () => {
+      const dir = tempLogs();
+      writeFileSync(path.join(dir, "stale.stdout.part"), "unfinished");
+
+      createVelina(withLogs({}, dir));
+
+      expect(readdirSync(dir)).toEqual([]);
     });
   });
 

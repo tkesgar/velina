@@ -60,6 +60,7 @@ beforeAll(async () => {
     configPath,
     JSON.stringify({
       port,
+      logs: { enabled: false },
       tasks: {
         greet: {
           cmd: process.execPath,
@@ -120,6 +121,7 @@ describe("Velina RPC", () => {
 
     expect(config.provided).toEqual({
       port,
+      logs: { enabled: false },
       tasks: expect.any(Object),
       taskGroup: { loops: ["loop"] },
     });

@@ -101,8 +101,18 @@ const zConfigTasks = z
   })
   .describe("Task definitions; wildcard keys with null values delete tasks.");
 
+const zConfigLogs = z
+  .object({
+    enabled: z.boolean(),
+    // Resolved against rootDir, like task cwd and file paths.
+    dir: z.string().min(1),
+  })
+  .strict()
+  .partial();
+
 export const zConfig = z
   .object({
+    logs: zConfigLogs,
     port: z.number().int().min(1).max(65535),
     inheritEnv: z.boolean(),
     rootDir: z.string(),
@@ -125,6 +135,10 @@ export const DEFAULT_PORT = 2222;
 export const DEFAULT_PACKAGE_MANAGER = "bun";
 
 export const DEFAULT_INHERIT_ENV = true;
+
+export const DEFAULT_LOG_PERSISTENCE = true;
+
+export const DEFAULT_LOG_DIR = ".velina/logs";
 
 export async function readConfig(
   opts: { configPath?: string; cwd?: string } = {},
@@ -348,6 +362,10 @@ async function scanTasks(ctx: {
 // === resolve config
 
 export interface ResolvedConfig {
+  logs: {
+    enabled: boolean;
+    dir: string;
+  };
   port: number;
   vars: Record<string, unknown>;
   env: Record<string, string>;
@@ -535,6 +553,10 @@ export async function resolveConfig(
   }
 
   return {
+    logs: {
+      enabled: config.logs?.enabled ?? DEFAULT_LOG_PERSISTENCE,
+      dir: path.resolve(rootDir, config.logs?.dir ?? DEFAULT_LOG_DIR),
+    },
     port,
     vars,
     env,

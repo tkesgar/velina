@@ -15,6 +15,11 @@ export interface LogEntry {
   timestamp: number;
 }
 
+export interface LogFiles {
+  stdout: string;
+  stderr: string;
+}
+
 export interface ProcessInfo {
   id: string;
   taskName: string;
@@ -31,6 +36,9 @@ export interface ProcessInfo {
   // Wall-clock duration from just before spawn to after log collection.
   // Meaningful only for processes that have stopped.
   durationMs?: number;
+  // Absolute paths to the persisted logs, present once the process has
+  // stopped and log persistence is enabled and succeeded.
+  logFiles?: LogFiles;
 }
 
 export interface ProcessMetrics {

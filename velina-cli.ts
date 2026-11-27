@@ -2,7 +2,7 @@
 
 import type { RpcStub } from "capnweb";
 
-import { isYamlConfig, type ProcessKind, type VelinaApi } from "./lib/api";
+import { isYamlConfig, type LogFiles, type ProcessKind, type VelinaApi } from "./lib/api";
 import { parseCliArgs, type CliArgs } from "./lib/cli-args";
 import { formatLogLine, openApi, printJson, resolvePort, resolveProcessId } from "./lib/cli-client";
 
@@ -50,6 +50,7 @@ interface BenchRun {
   kind: ProcessKind;
   durationMs?: number;
   exitCode?: number;
+  logFiles?: LogFiles;
 }
 
 interface BenchSummary {
@@ -163,6 +164,7 @@ async function runBench(args: CliArgs, api: RpcStub<VelinaApi>): Promise<BenchRe
         kind: "run",
         durationMs: finished.durationMs,
         exitCode: finished.exitCode,
+        logFiles: finished.logFiles,
       });
 
       if (cancelled) break;

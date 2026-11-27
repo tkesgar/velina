@@ -1,11 +1,22 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { finished } from "node:stream/promises";
 import type { Subprocess } from "bun";
+import type { WriteStream } from "node:fs";
 
 import type {
   DeleteProcessesOptions,
   HostMetrics,
   LogEntry,
+  LogFiles,
   LogType,
   ProcessFilter,
   ProcessInfo,
@@ -30,6 +41,8 @@ import {
 
 const MAX_LOG_ENTRIES = 5000;
 const STOP_TIMEOUT_MS = 5000;
+const SHORT_UID_LENGTH = 8;
+const MAX_TASK_NAME_LENGTH = 60;
 
 type ConfigFile = NonNullable<ResolvedConfig["files"]>[number];
 
@@ -41,6 +54,8 @@ interface LogSubscriber {
   controller?: ReadableStreamDefaultController<LogEntry>;
 }
 
+type PersistedPaths = { temp: string; final: string };
+
 interface ManagedProcess {
   info: ProcessInfo;
   subprocess: Subprocess | null;
@@ -49,6 +64,18 @@ interface ManagedProcess {
   exit: Promise<void>;
   metrics: MetricSample[];
   metricState?: CollectorState;
+  logPaths?: Record<LogType, PersistedPaths>;
+  logWriters?: Record<LogType, WriteStream>;
+  logWriteFailed?: boolean;
+}
+
+function normalizeTaskName(name: string): string {
+  const normalized = name
+    .replace(/[^\p{L}\p{N}._-]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, MAX_TASK_NAME_LENGTH)
+    .replace(/-+$/g, "");
+  return normalized || "task";
 }
 
 function trimToLimit(entries: unknown[], max = MAX_LOG_ENTRIES): void {
@@ -87,6 +114,7 @@ export class Velina implements VelinaApi {
     this.#loaded = loaded;
     this.#config = loaded.resolved;
     this.#writeFiles(this.#config.files ?? []);
+    this.#prepareLogDir();
 
     this.#metricsCollector = new MetricsCollector(opts.metricsSource ?? createMetricsSource());
     if (this.#metricsCollector.supported) {
@@ -188,6 +216,7 @@ export class Velina implements VelinaApi {
       exit: Promise.resolve(),
       metrics: [],
     };
+    this.#openLogWriters(managed, name);
 
     const subprocess = Bun.spawn({
       cmd: [task.cmd, ...task.args],
@@ -203,12 +232,14 @@ export class Velina implements VelinaApi {
       this.#readLogs(managed, subprocess.stdout, "stdout"),
       this.#readLogs(managed, subprocess.stderr, "stderr"),
     ])
-      .then(([exitCode]) => {
+      .then(async ([exitCode]) => {
         this.#finalize(managed, exitCode);
+        await this.#finishLogs(managed);
       })
-      .catch((error: unknown) => {
+      .catch(async (error: unknown) => {
         console.error(`Failed to collect logs for task "${name}":`, error);
         this.#finalize(managed, -1);
+        await this.#finishLogs(managed);
       });
 
     this.#processes.set(info.id, managed);
@@ -330,6 +361,12 @@ export class Velina implements VelinaApi {
       if (managed.info.state === "running") {
         managed.subprocess?.kill("SIGTERM");
       }
+      // An abrupt dispose cannot flush; leave .part files for startup cleanup.
+      const writers = managed.logWriters;
+      if (writers) {
+        managed.logWriters = undefined;
+        for (const writer of Object.values(writers)) writer.end();
+      }
     }
   }
 
@@ -424,6 +461,10 @@ export class Velina implements VelinaApi {
     managed.logs.push(entry);
     trimToLimit(managed.logs);
 
+    if (managed.logWriters && !managed.logWriteFailed) {
+      managed.logWriters[type].write(`${line}\n`);
+    }
+
     for (const subscriber of managed.subscribers) {
       if (subscriber.type !== type) continue;
 
@@ -466,6 +507,8 @@ export class Velina implements VelinaApi {
   }
 
   #finalize(managed: ManagedProcess, exitCode: number): void {
+    if (managed.info.state === "stopped") return;
+
     managed.info.state = "stopped";
     managed.info.stoppedAt = Date.now();
     managed.info.exitCode = exitCode;
@@ -485,6 +528,96 @@ export class Velina implements VelinaApi {
     for (const file of files) {
       mkdirSync(dirname(file.path), { recursive: true });
       writeFileSync(file.path, file.content);
+    }
+  }
+
+  #prepareLogDir(): void {
+    if (!this.#config.logs.enabled) return;
+
+    mkdirSync(this.#config.logs.dir, { recursive: true });
+    // A process killed with the server may leave an unfinished .part file.
+    // Final files never carry this suffix, so they are safe to remove.
+    for (const entry of readdirSync(this.#config.logs.dir)) {
+      if (!entry.endsWith(".part")) continue;
+      try {
+        unlinkSync(join(this.#config.logs.dir, entry));
+      } catch {
+        // Best effort: a stale temp file is harmless.
+      }
+    }
+  }
+
+  #openLogWriters(managed: ManagedProcess, taskName: string): void {
+    if (!this.#config.logs.enabled) return;
+
+    const dir = this.#config.logs.dir;
+    const base = normalizeTaskName(taskName);
+
+    // A short uid keeps names readable. If it would collide with files from
+    // an earlier run, extend it until both final names are unused.
+    let uidLength = SHORT_UID_LENGTH;
+    let uid = managed.info.id.slice(0, uidLength);
+    while (uidLength <= managed.info.id.length) {
+      const taken = [`.out.log`, `.err.log`].some((suffix) =>
+        existsSync(join(dir, `${base}-${uid}${suffix}`)),
+      );
+      if (!taken) break;
+      uidLength = Math.min(uidLength + 4, managed.info.id.length);
+      uid = managed.info.id.slice(0, uidLength);
+    }
+
+    managed.logPaths = {
+      stdout: {
+        temp: join(dir, `${base}-${uid}.out.part`),
+        final: join(dir, `${base}-${uid}.out.log`),
+      },
+      stderr: {
+        temp: join(dir, `${base}-${uid}.err.part`),
+        final: join(dir, `${base}-${uid}.err.log`),
+      },
+    };
+
+    managed.logWriters = {
+      stdout: createWriteStream(managed.logPaths.stdout.temp),
+      stderr: createWriteStream(managed.logPaths.stderr.temp),
+    };
+
+    for (const writer of Object.values(managed.logWriters)) {
+      writer.on("error", (error: unknown) => {
+        if (!managed.logWriteFailed) {
+          console.error(`Failed to persist logs for task "${taskName}":`, error);
+        }
+        managed.logWriteFailed = true;
+      });
+    }
+  }
+
+  async #finishLogs(managed: ManagedProcess): Promise<void> {
+    const writers = managed.logWriters;
+    const paths = managed.logPaths;
+    if (!writers || !paths) return;
+
+    managed.logWriters = undefined;
+    const written: Partial<LogFiles> = {};
+    await Promise.all(
+      (["stdout", "stderr"] as const).map(async (type) => {
+        const writer = writers[type];
+        try {
+          writer.end();
+          await finished(writer);
+          if (managed.logWriteFailed) return;
+          renameSync(paths[type].temp, paths[type].final);
+          written[type] = paths[type].final;
+        } catch (error) {
+          if (!managed.logWriteFailed) {
+            console.error(`Failed to finish log file for task "${managed.info.taskName}":`, error);
+          }
+        }
+      }),
+    );
+
+    if (written.stdout !== undefined && written.stderr !== undefined) {
+      managed.info.logFiles = { stdout: written.stdout, stderr: written.stderr };
     }
   }
 }

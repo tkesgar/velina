@@ -7,6 +7,7 @@ import { readConfig, zConfig } from "./config";
 
 const AGENT_MARKER_START = "<!-- velina:start -->";
 const AGENT_MARKER_END = "<!-- velina:end -->";
+const LOG_IGNORE_ENTRY = ".velina/logs/";
 
 const AGENT_DOC = `${AGENT_MARKER_START}
 ## Velina
@@ -14,6 +15,8 @@ const AGENT_DOC = `${AGENT_MARKER_START}
 Velina is configured in this repository. Start it with \`velina\` (or \`bun run velina\`), then open http://127.0.0.1:2222/ui/ to inspect tasks and logs. Use \`velina config check\` to validate \`.velina.yml\`.
 
 For benchmarking, use \`velina-cli bench <task> --repeat N --label <label>\`; it returns per-run timings and summary statistics as JSON. Hook tasks can clear caches between runs with \`--pre-hook\` / \`--post-hook\`, and \`--wait <seconds>\` adds a pause between iterations. Benchmarking targets relatively long tasks (roughly > 100 ms); for micro-benchmarks use a dedicated test harness.
+
+Finished processes have separate stdout and stderr log files under \`.velina/logs/\`. The exact paths are in each process's \`logFiles\` field, including in \`bench\` results; use those paths to read build output.
 ${AGENT_MARKER_END}`;
 
 const STARTER_CONFIG = `# Velina configuration.
@@ -39,6 +42,17 @@ export interface InitResult {
   createdConfig: boolean;
   scriptsAdded: string[];
   agentDoc: "added" | "updated" | "skipped";
+  gitignoreUpdated: boolean;
+}
+
+function updateGitignore(cwd: string): boolean {
+  const gitignorePath = join(cwd, ".gitignore");
+  const current = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf8") : "";
+  if (current.split(/\r?\n/).some((line) => line.trim() === LOG_IGNORE_ENTRY)) return false;
+
+  const separator = current.length === 0 || current.endsWith("\n") ? "" : "\n";
+  writeFileSync(gitignorePath, `${current}${separator}${LOG_IGNORE_ENTRY}\n`);
+  return true;
 }
 
 export async function initProject(opts: InitOptions = {}): Promise<InitResult> {
@@ -90,7 +104,9 @@ export async function initProject(opts: InitOptions = {}): Promise<InitResult> {
     }
   }
 
-  return { configPath, createdConfig, scriptsAdded, agentDoc };
+  const gitignoreUpdated = updateGitignore(cwd);
+
+  return { configPath, createdConfig, scriptsAdded, agentDoc, gitignoreUpdated };
 }
 
 export function getConfigSchema(): Record<string, unknown> {
@@ -168,6 +184,7 @@ export async function handleCommand(argv: string[]): Promise<number | undefined>
         `  scripts: ${result.scriptsAdded.length ? result.scriptsAdded.join(", ") : "none added"}`,
       );
       console.log(`  AGENTS.md: ${result.agentDoc}`);
+      console.log(`  .gitignore: ${result.gitignoreUpdated ? "added logs entry" : "unchanged"}`);
       console.log("Start the server with `velina` and open http://127.0.0.1:2222/ui/");
     }
 

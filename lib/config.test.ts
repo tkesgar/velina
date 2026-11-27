@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as path from "node:path";
 
 import {
+  DEFAULT_LOG_DIR,
+  DEFAULT_LOG_PERSISTENCE,
   DEFAULT_PACKAGE_MANAGER,
   DEFAULT_PORT,
   type Config,
@@ -280,6 +282,26 @@ describe("config", () => {
       expect(resolved.port).toBe(DEFAULT_PORT);
       expect(resolved.vars).toEqual({});
       expect(resolved.files).toEqual([]);
+      expect(resolved.logs).toEqual({
+        enabled: DEFAULT_LOG_PERSISTENCE,
+        dir: path.resolve(DEFAULT_LOG_DIR),
+      });
+    });
+
+    it("should resolve the log directory against rootDir", async () => {
+      const resolved = await resolveConfig({
+        rootDir: "/tmp/velina-root",
+        logs: { enabled: false, dir: "./artifacts/logs" },
+      });
+
+      expect(resolved.logs).toEqual({
+        enabled: false,
+        dir: path.resolve("/tmp/velina-root/artifacts/logs"),
+      });
+    });
+
+    it("should reject unknown log settings", () => {
+      expect(() => zConfig.parse({ logs: { unknown: true } })).toThrow();
     });
 
     it("should use the provided port", async () => {
