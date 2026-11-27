@@ -3,7 +3,7 @@ import { useState } from "react";
 import { FiPlay, FiSquare, FiTerminal } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
-import type { LogType } from "../../../lib/api";
+import type { LogType } from "#/lib/api";
 import { LogViewer } from "../components/log-viewer";
 import { useConfig, useProcessLogs, useProcesses } from "../lib/hooks";
 import { useVelina } from "../lib/velina-context";

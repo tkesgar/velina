@@ -1,7 +1,7 @@
 import { newWebSocketRpcSession, type RpcStub } from "capnweb";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 
-import type { VelinaApi } from "../../../lib/api";
+import type { VelinaApi } from "#/lib/api";
 
 interface VelinaContextValue {
   api: RpcStub<VelinaApi>;

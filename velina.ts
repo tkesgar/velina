@@ -9,13 +9,13 @@ import {
   shouldPrintBanner,
   shouldShowArt,
   type TerminalContext,
-} from "./lib/banner";
-import { parseArgs } from "./lib/cli";
-import { handleCommand } from "./lib/commands";
-import { loadConfig } from "./lib/config";
-import { Velina } from "./lib/velina";
-import { VelinaRpcTarget } from "./lib/velina-rpc";
-import ui from "./web/index.html";
+} from "#/lib/banner";
+import { parseArgs } from "#/lib/cli";
+import { handleCommand } from "#/lib/commands";
+import { loadConfig } from "#/lib/config";
+import { Velina } from "#/lib/velina";
+import { VelinaRpcTarget } from "#/lib/velina-rpc";
+import ui from "#/web/index.html";
 
 // The API controls local processes and exposes their logs, so it is
 // intentionally unreachable from other hosts.

@@ -8,8 +8,8 @@ import {
   type ProcessInfo,
   type ProcessMetrics,
   type YamlConfig,
-} from "../../../lib/api";
-import type { LoadedConfig } from "../../../lib/config";
+} from "#/lib/api";
+import type { LoadedConfig } from "#/lib/config";
 import { useVelina } from "./velina-context";
 
 const MAX_DISPLAYED_LINES = 1000;

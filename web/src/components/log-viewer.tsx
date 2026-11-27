@@ -2,7 +2,7 @@ import { Box, Button, Flex, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { FiAlertCircle, FiPause, FiPlay, FiTerminal } from "react-icons/fi";
 
-import type { LogEntry, LogType } from "../../../lib/api";
+import type { LogEntry, LogType } from "#/lib/api";
 
 interface LogViewerProps {
   lines: LogEntry[];

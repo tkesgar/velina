@@ -3,8 +3,8 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs as nodeParseArgs } from "node:util";
 import * as z from "zod";
 
-import agentDocBody from "../assets/agent-doc.txt";
-import usage from "../assets/velina-usage.txt";
+import agentDocBody from "#/assets/agent-doc.txt";
+import usage from "#/assets/velina-usage.txt";
 
 import { readConfig, zConfig } from "./config";
 

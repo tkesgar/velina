@@ -1,4 +1,4 @@
-import velinaArt from "../assets/velina.txt";
+import velinaArt from "#/assets/velina.txt";
 
 import { DEFAULT_PORT } from "./config";
 

@@ -25,7 +25,7 @@ import {
 } from "react-icons/fi";
 import { useSearchParams } from "react-router";
 
-import type { LogType, ProcessInfo } from "../../../lib/api";
+import type { LogType, ProcessInfo } from "#/lib/api";
 import { DataInspector } from "../components/data-inspector";
 import { LogViewer } from "../components/log-viewer";
 import { Sparkline } from "../components/sparkline";

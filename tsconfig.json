@@ -5,6 +5,9 @@
     "lib": ["esnext", "dom"],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "paths": {
+      "#/*": ["./*"]
+    },
     "customConditions": ["bun"],
     "strict": true,
     "skipLibCheck": true,

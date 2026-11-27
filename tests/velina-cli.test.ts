@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 import type { Subprocess } from "bun";
 
-import type { ProcessInfo } from "../lib/api";
-import { DEFAULT_PORT } from "../lib/config";
+import type { ProcessInfo } from "#/lib/api";
+import { DEFAULT_PORT } from "#/lib/config";
 
 const projectRoot = path.resolve(import.meta.dir, "..");
 

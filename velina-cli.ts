@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 
-import usage from "./assets/velina-cli-usage.txt";
+import usage from "#/assets/velina-cli-usage.txt";
 import type { RpcStub } from "capnweb";
 
-import { isYamlConfig, type LogFiles, type ProcessKind, type VelinaApi } from "./lib/api";
-import { parseCliArgs, type CliArgs } from "./lib/cli-args";
-import { formatLogLine, openApi, printJson, resolvePort, resolveProcessId } from "./lib/cli-client";
+import { isYamlConfig, type LogFiles, type ProcessKind, type VelinaApi } from "#/lib/api";
+import { parseCliArgs, type CliArgs } from "#/lib/cli-args";
+import { formatLogLine, openApi, printJson, resolvePort, resolveProcessId } from "#/lib/cli-client";
 
 const USAGE = usage.trimEnd();
 

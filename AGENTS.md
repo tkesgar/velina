@@ -21,6 +21,8 @@ Velina is a local task runner built on Bun. It scans `package.json` scripts, run
 | `web/`                                   | Vite-free frontend built by Bun's HTML import                                                                           |
 | `lib/tests/fixtures/`                    | config fixtures for tests                                                                                               |
 
+Imports that reach a top-level directory use the `#/` alias configured in `tsconfig.json` `paths`; imports within a directory stay relative.
+
 ## Commands
 
 ```
