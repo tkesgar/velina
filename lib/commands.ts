@@ -3,21 +3,16 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs as nodeParseArgs } from "node:util";
 import * as z from "zod";
 
+import agentDocBody from "../assets/agent-doc.txt";
+import usage from "../assets/velina-usage.txt";
+
 import { readConfig, zConfig } from "./config";
 
 const AGENT_MARKER_START = "<!-- velina:start -->";
 const AGENT_MARKER_END = "<!-- velina:end -->";
 const LOG_IGNORE_ENTRY = ".velina/logs/";
 
-const AGENT_DOC = `${AGENT_MARKER_START}
-## Velina
-
-Velina is configured in this repository. Start it with \`velina\` (or \`bun run velina\`), then open http://127.0.0.1:2222/ui/ to inspect tasks and logs. Use \`velina config check\` to validate \`.velina.yml\`.
-
-For benchmarking, use \`velina-cli bench <task> --repeat N --label <label>\`; it returns per-run timings and summary statistics as JSON. Hook tasks can clear caches between runs with \`--pre-hook\` / \`--post-hook\`, and \`--wait <seconds>\` adds a pause between iterations. Benchmarking targets relatively long tasks (roughly > 100 ms); for micro-benchmarks use a dedicated test harness.
-
-Finished processes have separate stdout and stderr log files under \`.velina/logs/\`. The exact paths are in each process's \`logFiles\` field, including in \`bench\` results; use those paths to read build output.
-${AGENT_MARKER_END}`;
+const AGENT_DOC = `${AGENT_MARKER_START}\n${agentDocBody.trimEnd()}\n${AGENT_MARKER_END}`;
 
 const STARTER_CONFIG = `# Velina configuration.
 # Tasks are discovered automatically from package.json scripts.
@@ -25,12 +20,7 @@ const STARTER_CONFIG = `# Velina configuration.
 port: 2222
 `;
 
-const USAGE = `Usage:
-  velina                         start the server
-  velina --dev                   start the server with frontend hot reloading
-  velina init [path]             scaffold .velina.yml and package.json scripts
-  velina config check            validate .velina.yml
-  velina schema                  print the config JSON Schema`;
+const USAGE = usage.trimEnd();
 
 export interface InitOptions {
   cwd?: string;

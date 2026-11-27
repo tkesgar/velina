@@ -1,0 +1,6 @@
+Usage:
+  velina                         start the server
+  velina --dev                   start the server with frontend hot reloading
+  velina init [path]             scaffold .velina.yml and package.json scripts
+  velina config check            validate .velina.yml
+  velina schema                  print the config JSON Schema

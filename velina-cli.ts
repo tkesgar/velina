@@ -1,47 +1,13 @@
 #!/usr/bin/env bun
 
+import usage from "./assets/velina-cli-usage.txt";
 import type { RpcStub } from "capnweb";
 
 import { isYamlConfig, type LogFiles, type ProcessKind, type VelinaApi } from "./lib/api";
 import { parseCliArgs, type CliArgs } from "./lib/cli-args";
 import { formatLogLine, openApi, printJson, resolvePort, resolveProcessId } from "./lib/cli-client";
 
-const USAGE = `Usage:
-  velina-cli config [--format yaml]       show provided and resolved config
-  velina-cli groups                       list task groups and their tasks
-  velina-cli start <task> [--label L]     start a task
-  velina-cli start-group <group> [--label L]
-                                          start every task in a group
-  velina-cli ps [--label L] [--task T] [--kind K]
-                                          list matching processes
-  velina-cli process <id>                 show process details
-  velina-cli metrics <id>                 show process metrics history
-  velina-cli logs <id> [stdout|stderr]    stream process logs
-  velina-cli stop <id>                    stop a process
-  velina-cli stop-group <group>           stop running tasks in a group
-  velina-cli delete <id>                  delete a stopped process
-  velina-cli cleanup [--label L] [--task T]
-                                          delete stopped processes matching a filter
-  velina-cli bench <task> [--repeat N] [--label L] [--pre-hook T] [--post-hook T] [--wait S]
-                                          run a task N times and report timing
-
-Options:
-  --label <label>     label for started processes, or a filter for ps/cleanup
-  --task <task>       filter processes by task name (ps, cleanup)
-  --kind <kind>       filter by run, pre-hook, or post-hook (ps)
-  --repeat <n>        number of benchmark runs, 1-100 (default: 1)
-  --pre-hook <task>   task to run before each measured run
-  --post-hook <task>  task to run after each measured run
-  --wait <seconds>    pause between iterations; fractional values allowed (default: 0)
-  --port <port>       server port (default: from .velina.yml, otherwise 2222)
-  --json              log entries as JSON lines
-  --help              show this message
-
-Benchmarking is designed for relatively long tasks (roughly > 100 ms), where
-process-spawn overhead is negligible. For micro-benchmarks, use a dedicated
-test harness.
-
-Process ids may be abbreviated to any unique prefix.`;
+const USAGE = usage.trimEnd();
 
 interface BenchRun {
   id: string;

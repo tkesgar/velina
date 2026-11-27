@@ -15,7 +15,7 @@ Velina is a local task runner built on Bun. It scans `package.json` scripts, run
 | `lib/velina-rpc.ts`                      | `VelinaRpcTarget`, thin adapter over `Velina`                                                                           |
 | `lib/api.ts`                             | shared API types and `isYamlConfig()` guard                                                                             |
 | `lib/commands.ts`                        | `velina init`, `config check`, `schema` implementations                                                                 |
-| `assets/velina.txt`                      | ASCII art, imported as text by `lib/banner.ts`                                                                          |
+| `assets/`                                | Long literal text (ASCII art, help text, agent doc), imported as text. Excluded from formatting by `.oxfmtrc.json`.     |
 | `lib/banner.ts`                          | startup banner, terminal/agent detection, clipboard fallback                                                            |
 | `lib/cli-args.ts`, `lib/cli-client.ts`   | CLI argument parsing and client helpers                                                                                 |
 | `web/`                                   | Vite-free frontend built by Bun's HTML import                                                                           |

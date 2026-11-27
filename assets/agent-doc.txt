@@ -1,0 +1,7 @@
+## Velina
+
+Velina is configured in this repository. Start it with `velina` (or `bun run velina`), then open http://127.0.0.1:2222/ui/ to inspect tasks and logs. Use `velina config check` to validate `.velina.yml`.
+
+For benchmarking, use `velina-cli bench <task> --repeat N --label <label>`; it returns per-run timings and summary statistics as JSON. Hook tasks can clear caches between runs with `--pre-hook` / `--post-hook`, and `--wait <seconds>` adds a pause between iterations. Benchmarking targets relatively long tasks (roughly > 100 ms); for micro-benchmarks use a dedicated test harness.
+
+Finished processes have separate stdout and stderr log files under `.velina/logs/`. The exact paths are in each process's `logFiles` field, including in `bench` results; use those paths to read build output.
