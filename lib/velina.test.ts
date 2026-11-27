@@ -406,6 +406,110 @@ describe("Velina", () => {
     });
   });
 
+  describe("labels, kinds and filters", () => {
+    const loop = () => evalTask("setInterval(() => {}, 50)");
+
+    it("should store the label and kind of a started process", () => {
+      const velina = createVelina(
+        configWith({
+          build: evalTask("console.log('ok')"),
+          clean: evalTask("console.log('clean')"),
+        }),
+      );
+
+      const run = velina.startTask("build", { label: "benchmark" });
+      const hook = velina.startTask("clean", { label: "benchmark", kind: "pre-hook" });
+
+      expect(run.label).toBe("benchmark");
+      expect(run.kind).toBe("run");
+      expect(hook.label).toBe("benchmark");
+      expect(hook.kind).toBe("pre-hook");
+    });
+
+    it("should apply the same options to every member of a group", async () => {
+      const velina = createVelina(configWith({ a: loop(), b: loop() }, [], { dev: ["a", "b"] }));
+
+      const processes = await velina.startTaskGroup("dev", {
+        label: "group-label",
+        kind: "post-hook",
+      });
+
+      expect(processes).toHaveLength(2);
+      expect(processes.every((p) => p.label === "group-label" && p.kind === "post-hook")).toBe(
+        true,
+      );
+    });
+
+    it("should filter processes by label, task and kind", () => {
+      const velina = createVelina(configWith({ a: loop(), b: loop(), c: loop() }));
+      velina.startTask("a", { label: "x" });
+      velina.startTask("b", { label: "y" });
+      velina.startTask("c", { label: "x", kind: "pre-hook" });
+
+      expect(
+        velina
+          .getAllProcesses({ label: "x" })
+          .map((p) => p.taskName)
+          .sort(),
+      ).toEqual(["a", "c"]);
+      expect(velina.getAllProcesses({ label: "x", kind: "run" }).map((p) => p.taskName)).toEqual([
+        "a",
+      ]);
+      expect(velina.getAllProcesses({ taskName: "b" }).map((p) => p.label)).toEqual(["y"]);
+    });
+  });
+
+  describe("waitForProcess", () => {
+    it("should resolve with the final details and a duration", async () => {
+      const velina = createVelina(configWith({ greet: evalTask("console.log('hi')") }));
+
+      const running = velina.startTask("greet", { label: "benchmark" });
+      expect(running.durationMs).toBeUndefined();
+
+      const finished = await velina.waitForProcess(running.id);
+
+      expect(finished.state).toBe("stopped");
+      expect(finished.exitCode).toBe(0);
+      expect(finished.durationMs).toBeGreaterThanOrEqual(0);
+      expect(finished.stoppedAt!).toBeGreaterThanOrEqual(finished.startedAt);
+      expect((await velina.waitForProcess(running.id)).durationMs).toBe(finished.durationMs);
+    });
+
+    it("should reject an unknown process", async () => {
+      const velina = createVelina(configWith({}));
+
+      await expect(velina.waitForProcess("missing")).rejects.toThrow("Unknown process: missing");
+    });
+  });
+
+  describe("deleteProcesses", () => {
+    it("should require at least one filter", () => {
+      const velina = createVelina(configWith({}));
+
+      expect(() => velina.deleteProcesses({})).toThrow("requires a label or taskName filter");
+    });
+
+    it("should delete stopped matches and skip running ones", async () => {
+      const velina = createVelina(
+        configWith({
+          loop: evalTask("setInterval(() => {}, 50)"),
+          quick: evalTask("console.log(1)"),
+        }),
+      );
+      const running = velina.startTask("loop", { label: "cleanup" });
+      const finished = velina.startTask("quick", { label: "cleanup" });
+      await waitForState(velina, finished.id, "stopped");
+
+      expect(velina.deleteProcesses({ label: "cleanup" })).toBe(1);
+      expect(velina.getAllProcesses().map((p) => p.id)).toEqual([running.id]);
+      expect(() => velina.getProcess(finished.id)).toThrow("Unknown process");
+
+      await velina.stopProcess(running.id);
+      expect(velina.deleteProcesses({ taskName: "loop" })).toBe(1);
+      expect(velina.getAllProcesses()).toEqual([]);
+    });
+  });
+
   it("should throw when getting an unknown process", () => {
     const velina = createVelina(configWith({}));
 

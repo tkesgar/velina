@@ -85,4 +85,82 @@ describe("parseCliArgs", () => {
     expect(() => parseCliArgs(["config", "--port", "0"])).toThrow("Invalid --port");
     expect(() => parseCliArgs(["logs", "abc", "both"])).toThrow("Invalid log type");
   });
+
+  it("should parse labels on task commands", () => {
+    expect(parseCliArgs(["start", "build", "--label", "bench"])).toEqual({
+      command: "start",
+      json: false,
+      target: "build",
+      label: "bench",
+    });
+    expect(parseCliArgs(["start-group", "dev", "--label", "bench"])).toEqual({
+      command: "start-group",
+      json: false,
+      target: "dev",
+      label: "bench",
+    });
+  });
+
+  it("should parse process filters and cleanup", () => {
+    expect(parseCliArgs(["ps", "--label", "bench", "--task", "build", "--kind", "run"])).toEqual({
+      command: "ps",
+      json: false,
+      label: "bench",
+      taskFilter: "build",
+      kindFilter: "run",
+    });
+    expect(parseCliArgs(["cleanup", "--label", "bench"])).toEqual({
+      command: "cleanup",
+      json: false,
+      label: "bench",
+    });
+  });
+
+  it("should parse benchmark options with fractional wait in seconds", () => {
+    expect(
+      parseCliArgs([
+        "bench",
+        "build",
+        "--repeat",
+        "5",
+        "--label",
+        "benchmark",
+        "--pre-hook",
+        "clean",
+        "--post-hook",
+        "reset",
+        "--wait",
+        "0.5",
+      ]),
+    ).toEqual({
+      command: "bench",
+      json: false,
+      target: "build",
+      repeat: 5,
+      label: "benchmark",
+      preHook: "clean",
+      postHook: "reset",
+      waitSeconds: 0.5,
+    });
+    expect(parseCliArgs(["bench", "build"])).toEqual({
+      command: "bench",
+      json: false,
+      target: "build",
+    });
+  });
+
+  it("should reject invalid filters and benchmark options", () => {
+    expect(() => parseCliArgs(["ps", "--kind", "unknown"])).toThrow("Invalid --kind");
+    expect(() => parseCliArgs(["ps", "--repeat", "5"])).toThrow("only valid for bench");
+    expect(() => parseCliArgs(["cleanup"])).toThrow("requires --label or --task");
+    expect(() => parseCliArgs(["bench", "build", "--repeat", "0"])).toThrow("Invalid --repeat");
+    expect(() => parseCliArgs(["bench", "build", "--repeat", "101"])).toThrow("Invalid --repeat");
+    expect(() => parseCliArgs(["bench", "build", "--wait", "1m"])).toThrow("Invalid --wait");
+    expect(() => parseCliArgs(["bench", "build", "--wait=-1"])).toThrow("Invalid --wait");
+    expect(() => parseCliArgs(["bench", "build", "--wait", "1500ms"])).toThrow("Invalid --wait");
+    expect(() => parseCliArgs(["bench", "build", "--pre-hook", "build"])).toThrow("different task");
+    expect(() => parseCliArgs(["bench", "build", "--post-hook", "build"])).toThrow(
+      "different task",
+    );
+  });
 });

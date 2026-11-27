@@ -82,6 +82,41 @@ beforeAll(async () => {
           env: {},
           files: [],
         },
+        quick: {
+          cmd: process.execPath,
+          args: ["-e", "console.log('quick done')"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
+        failing: {
+          cmd: process.execPath,
+          args: ["-e", "process.exit(3)"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
+        prehook: {
+          cmd: process.execPath,
+          args: ["-e", "console.log('pre')"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
+        posthook: {
+          cmd: process.execPath,
+          args: ["-e", "console.log('post')"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
+        badhook: {
+          cmd: process.execPath,
+          args: ["-e", "process.exit(4)"],
+          cwd: projectRoot,
+          env: {},
+          files: [],
+        },
       },
       taskGroup: {
         greeters: ["greet"],
@@ -246,6 +281,85 @@ describe("velina-cli", () => {
 
     const deleted = cli("delete", processes[0].id);
     expect(deleted.exitCode).toBe(0);
+  });
+
+  it("should label, filter and clean up processes", () => {
+    const started = cli("start", "greet", "--label", "filter-test");
+    expect(started.exitCode).toBe(0);
+    const process = JSON.parse(started.stdout) as ProcessInfo;
+    expect(process.label).toBe("filter-test");
+    expect(process.kind).toBe("run");
+
+    const filtered = cli("ps", "--label", "filter-test", "--kind", "run");
+    expect((JSON.parse(filtered.stdout) as ProcessInfo[]).map((p) => p.id)).toEqual([process.id]);
+
+    cli("stop", process.id.slice(0, 8));
+    const cleaned = cli("cleanup", "--label", "filter-test");
+    expect(JSON.parse(cleaned.stdout)).toEqual({ deleted: 1 });
+  });
+
+  it("should benchmark a short task with hooks and a wait", () => {
+    const result = cli(
+      "bench",
+      "quick",
+      "--repeat",
+      "2",
+      "--label",
+      "bench-test",
+      "--pre-hook",
+      "prehook",
+      "--post-hook",
+      "posthook",
+      "--wait",
+      "0.01",
+    );
+
+    expect(result.exitCode).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.runs).toHaveLength(2);
+    expect(report.runs.every((run: ProcessInfo) => run.label === "bench-test")).toBe(true);
+    expect(report.summary.meanSeconds).toBeGreaterThanOrEqual(0);
+    expect(report.summary.p95Seconds).toBeGreaterThanOrEqual(0);
+    expect(report.error).toBeUndefined();
+
+    const all = cli("ps", "--label", "bench-test");
+    expect(JSON.parse(all.stdout)).toHaveLength(6);
+    const runs = cli("ps", "--label", "bench-test", "--kind", "run");
+    expect(JSON.parse(runs.stdout)).toHaveLength(2);
+
+    const cleaned = cli("cleanup", "--label", "bench-test");
+    expect(JSON.parse(cleaned.stdout)).toEqual({ deleted: 6 });
+  });
+
+  it("should stop benchmarking after a failed run", () => {
+    const result = cli("bench", "failing", "--repeat", "3", "--label", "fail-bench");
+
+    expect(result.exitCode).toBe(1);
+    const report = JSON.parse(result.stdout);
+    expect(report.runs).toHaveLength(1);
+    expect(report.error).toContain("exited with code 3");
+
+    cli("cleanup", "--label", "fail-bench");
+  });
+
+  it("should stop benchmarking after a failed hook", () => {
+    const result = cli(
+      "bench",
+      "quick",
+      "--repeat",
+      "2",
+      "--label",
+      "hook-fail",
+      "--pre-hook",
+      "badhook",
+    );
+
+    expect(result.exitCode).toBe(1);
+    const report = JSON.parse(result.stdout);
+    expect(report.runs).toHaveLength(0);
+    expect(report.error).toContain("Pre-hook");
+
+    cli("cleanup", "--label", "hook-fail");
   });
 
   it("should exit with code 2 on a usage error", () => {

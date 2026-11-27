@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { newHttpBatchRpcSession, newWebSocketRpcSession, type RpcStub } from "capnweb";
 import type { Subprocess } from "bun";
 
-import { isYamlConfig, type LogEntry, type VelinaApi } from "./api";
+import { isYamlConfig, type LogEntry, type ProcessKind, type VelinaApi } from "./api";
 
 const projectRoot = path.join(import.meta.dir, "..");
 
@@ -212,6 +212,34 @@ describe("Velina RPC", () => {
     await expectRejection(api.getProcessMetrics(42 as unknown as string), "expected string");
     await expectRejection(api.startTaskGroup(42 as unknown as string), "expected string");
     await expectRejection(api.stopTaskGroup(42 as unknown as string), "expected string");
+  });
+
+  it("should support labels, filters and waiting over RPC", async () => {
+    const process = await api.startTask("greet", { label: "rpc-label", kind: "run" });
+    try {
+      expect(process.label).toBe("rpc-label");
+      expect(process.kind).toBe("run");
+      expect((await api.getAllProcesses({ label: "rpc-label" })).map((p) => p.id)).toEqual([
+        process.id,
+      ]);
+      expect((await api.getAllProcesses({ label: "missing-label" })).length).toBe(0);
+
+      const finished = await api.waitForProcess(process.id);
+      expect(finished.state).toBe("stopped");
+      expect(finished.durationMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      await api.stopProcess(process.id);
+      api.deleteProcesses({ label: "rpc-label" });
+    }
+  });
+
+  it("should validate options for the new methods at the RPC boundary", async () => {
+    await expectRejection(api.startTask("greet", { label: 42 as unknown as string }), "string");
+    await expectRejection(
+      api.getAllProcesses({ kind: "unknown" as ProcessKind }),
+      "expected one of",
+    );
+    await expectRejection(api.deleteProcesses({}), "requires a label or taskName filter");
   });
 
   it("should answer HTTP batch calls", async () => {

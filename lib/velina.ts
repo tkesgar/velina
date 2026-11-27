@@ -3,11 +3,14 @@ import { dirname } from "node:path";
 import type { Subprocess } from "bun";
 
 import type {
+  DeleteProcessesOptions,
   HostMetrics,
   LogEntry,
   LogType,
+  ProcessFilter,
   ProcessInfo,
   ProcessMetrics,
+  StartOptions,
   TaskGroupInfo,
   VelinaApi,
   YamlConfig,
@@ -107,8 +110,8 @@ export class Velina implements VelinaApi {
     return this.#loaded;
   }
 
-  startTask(name: string): ProcessInfo {
-    return this.#snapshot(this.#start(name));
+  startTask(name: string, opts: StartOptions = {}): ProcessInfo {
+    return this.#snapshot(this.#start(name, opts));
   }
 
   getAllTaskGroups(): TaskGroupInfo[] {
@@ -118,7 +121,7 @@ export class Velina implements VelinaApi {
     }));
   }
 
-  async startTaskGroup(name: string): Promise<ProcessInfo[]> {
+  async startTaskGroup(name: string, opts: StartOptions = {}): Promise<ProcessInfo[]> {
     const tasks = this.#groupTasks(name);
     const started: ManagedProcess[] = [];
     const processes: ProcessInfo[] = [];
@@ -131,7 +134,7 @@ export class Velina implements VelinaApi {
           continue;
         }
 
-        const managed = this.#start(taskName);
+        const managed = this.#start(taskName, opts);
         started.push(managed);
         processes.push(this.#snapshot(managed));
       }
@@ -152,7 +155,7 @@ export class Velina implements VelinaApi {
     return Promise.all(running.map((managed) => this.stopProcess(managed.info.id)));
   }
 
-  #start(name: string): ManagedProcess {
+  #start(name: string, opts: StartOptions): ManagedProcess {
     const task = this.#config.tasks[name];
     if (!task) {
       throw new Error(`Unknown task: ${name}`);
@@ -173,6 +176,8 @@ export class Velina implements VelinaApi {
       args: [...task.args],
       cwd: task.cwd,
       metrics: null,
+      label: opts.label,
+      kind: opts.kind ?? "run",
     };
 
     const managed: ManagedProcess = {
@@ -210,12 +215,25 @@ export class Velina implements VelinaApi {
     return managed;
   }
 
-  getAllProcesses(): ProcessInfo[] {
-    return Array.from(this.#processes.values(), (managed) => this.#snapshot(managed));
+  getAllProcesses(opts: ProcessFilter = {}): ProcessInfo[] {
+    const matches = (info: ProcessInfo): boolean =>
+      (opts.label === undefined || info.label === opts.label) &&
+      (opts.taskName === undefined || info.taskName === opts.taskName) &&
+      (opts.kind === undefined || info.kind === opts.kind);
+
+    return Array.from(this.#processes.values())
+      .filter((managed) => matches(managed.info))
+      .map((managed) => this.#snapshot(managed));
   }
 
   getProcess(id: string): ProcessInfo {
     return this.#snapshot(this.#get(id));
+  }
+
+  async waitForProcess(id: string): Promise<ProcessInfo> {
+    const managed = this.#get(id);
+    await managed.exit;
+    return this.#snapshot(managed);
   }
 
   getProcessMetrics(id: string): ProcessMetrics {
@@ -284,6 +302,26 @@ export class Velina implements VelinaApi {
 
     this.#closeSubscribers(managed);
     this.#processes.delete(id);
+  }
+
+  deleteProcesses(opts: DeleteProcessesOptions): number {
+    if (opts.label === undefined && opts.taskName === undefined) {
+      throw new Error("deleteProcesses requires a label or taskName filter");
+    }
+
+    let deleted = 0;
+    for (const [id, managed] of this.#processes) {
+      if (opts.label !== undefined && managed.info.label !== opts.label) continue;
+      if (opts.taskName !== undefined && managed.info.taskName !== opts.taskName) continue;
+      // Running processes keep their slot until they are stopped explicitly.
+      if (managed.info.state === "running") continue;
+
+      this.#closeSubscribers(managed);
+      this.#processes.delete(id);
+      deleted++;
+    }
+
+    return deleted;
   }
 
   [Symbol.dispose](): void {
@@ -431,6 +469,7 @@ export class Velina implements VelinaApi {
     managed.info.state = "stopped";
     managed.info.stoppedAt = Date.now();
     managed.info.exitCode = exitCode;
+    managed.info.durationMs = Math.max(0, managed.info.stoppedAt - managed.info.startedAt);
     managed.subprocess = null;
     this.#closeSubscribers(managed);
   }

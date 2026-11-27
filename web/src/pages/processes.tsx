@@ -6,6 +6,7 @@ import {
   Grid,
   Heading,
   HStack,
+  Input,
   Table,
   Text,
   VisuallyHidden,
@@ -49,15 +50,25 @@ export function ProcessesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [actionError, setActionError] = useState<string | null>(null);
   const [logType, setLogType] = useState<LogType>("stdout");
+  const [labelFilter, setLabelFilter] = useState("");
 
+  const visible = labelFilter
+    ? processes.filter((process) => process.label?.includes(labelFilter))
+    : processes;
   const requestedId = searchParams.get("process");
-  const selected = processes.find((process) => process.id === requestedId) ?? processes[0];
+  const selected = visible.find((process) => process.id === requestedId) ?? visible[0];
   const { lines, error: logError } = useProcessLogs(selected?.id ?? null, logType);
   const { metrics, error: metricsError } = useProcessMetrics(selected?.id ?? null);
   const { metrics: hostMetrics } = useHostMetrics();
 
-  const stopped = processes.filter((process) => process.state === "stopped");
+  const stopped = visible.filter((process) => process.state === "stopped");
   const cleanup = () => Promise.all(stopped.map((process) => api.deleteProcess(process.id)));
+
+  function formatDuration(ms: number | undefined): string {
+    if (ms === undefined) return "—";
+    if (ms < 1000) return `${ms} ms`;
+    return `${(ms / 1000).toFixed(2)} s`;
+  }
 
   async function run(action: () => Promise<unknown>) {
     try {
@@ -103,6 +114,13 @@ export function ProcessesPage() {
       <HStack alignItems="start" gap="6" flexDirection={{ base: "column", lg: "row" }}>
         <Box minW="0" flex="none" w="full" maxW={{ base: undefined, lg: "30rem" }}>
           <HStack justify="flex-end" mb="2" minH="6">
+            <Input
+              size="sm"
+              maxW="12rem"
+              placeholder="Filter by label"
+              value={labelFilter}
+              onChange={(event) => setLabelFilter(event.target.value)}
+            />
             {stopped.length > 0 && (
               <Button
                 size="xs"
@@ -122,6 +140,7 @@ export function ProcessesPage() {
             <Table.ColumnGroup>
               <Table.Column htmlWidth="8rem" />
               <Table.Column />
+              <Table.Column htmlWidth="6rem" />
               <Table.Column htmlWidth="5rem" />
               <Table.Column htmlWidth="5rem" />
               <Table.Column htmlWidth="7rem" />
@@ -130,13 +149,14 @@ export function ProcessesPage() {
               <Table.Row>
                 <Table.ColumnHeader>Process</Table.ColumnHeader>
                 <Table.ColumnHeader>Task</Table.ColumnHeader>
+                <Table.ColumnHeader>Duration</Table.ColumnHeader>
                 <Table.ColumnHeader>State</Table.ColumnHeader>
                 <Table.ColumnHeader>Exit</Table.ColumnHeader>
                 <Table.ColumnHeader />
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {processes.map((process) => {
+              {visible.map((process) => {
                 const isSelected = process.id === selected?.id;
                 const taskRunningElsewhere = processes.some(
                   (candidate) =>
@@ -169,7 +189,16 @@ export function ProcessesPage() {
                         </HStack>
                       </Button>
                     </Table.Cell>
-                    <Table.Cell>{process.taskName}</Table.Cell>
+                    <Table.Cell>
+                      <HStack gap="1" wrap="wrap">
+                        <Text>{process.taskName}</Text>
+                        {process.label && <Badge colorPalette="purple">{process.label}</Badge>}
+                        {process.kind && process.kind !== "run" && (
+                          <Badge colorPalette="orange">{process.kind}</Badge>
+                        )}
+                      </HStack>
+                    </Table.Cell>
+                    <Table.Cell>{formatDuration(process.durationMs)}</Table.Cell>
                     <Table.Cell>
                       <Badge colorPalette={process.state === "running" ? "brand" : "gray"}>
                         {process.state}
@@ -235,7 +264,7 @@ export function ProcessesPage() {
               })}
             </Table.Body>
           </Table.Root>
-          {processes.length === 0 && <Text mt="2">No processes yet.</Text>}
+          {visible.length === 0 && <Text mt="2">No matching processes.</Text>}
         </Box>
 
         <Box minW="0" flex="auto">

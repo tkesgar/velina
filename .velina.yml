@@ -56,6 +56,25 @@ tasks:
       lib: ./lib
       web: ./web
 
+  # A deterministic workload for trying `velina-cli bench` (about 300 ms).
+  # For example:
+  #   velina-cli bench benchmark:sample --repeat 3 --label demo \
+  #     --pre-hook benchmark:clear --post-hook benchmark:restore --wait 0.1
+  benchmark:sample:
+    cmd: bun
+    args:
+      - -e
+      - "let total = 0; for (let i = 0; i < 400_000_000; i++) total += i % 7; console.log(total)"
+
+  # Stand-in hook tasks for the bench example above.
+  benchmark:clear:
+    cmd: bun
+    args: [-e, "console.log('cache cleared (pretend)')"]
+
+  benchmark:restore:
+    cmd: bun
+    args: [-e, "console.log('cache restored (pretend)')"]
+
   # Glob deletion: uncomment to remove the string-cwd task above. A leading
   # `*/` pattern also covers unprefixed names.
   # "*:where-am-i": null

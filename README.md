@@ -316,18 +316,20 @@ api.deleteProcess(process.id);
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `getConfig(opts?)`            | `{ provided, resolved }`: the parsed config and the fully resolved config, including all available tasks. Pass `{ format: "yaml" }` to receive both as YAML strings. |
 | `getAllTaskGroups()`          | All task groups with their resolved member task names.                                                                                                               |
-| `startTask(name)`             | Starts a task as a new process. Only one running process is allowed per task.                                                                                        |
-| `startTaskGroup(name)`        | Starts every task in a group, skipping members already running; returns one process per member.                                                                      |
-| `getAllProcesses()`           | All tracked processes, running and stopped.                                                                                                                          |
+| `startTask(name, opts?)`      | Starts a task as a new process. Only one running process is allowed per task. Pass `{ label, kind }` to tag the run.                                                 |
+| `startTaskGroup(name, opts?)` | Starts every task in a group, skipping members already running; returns one process per member. The same `opts` apply to every member.                               |
+| `getAllProcesses(opts?)`      | All tracked processes, running and stopped. Filter by exact `label`, `taskName`, or `kind`.                                                                          |
 | `getProcess(id)`              | Details for one process, including its latest metrics sample.                                                                                                        |
+| `waitForProcess(id)`          | Resolves with the final process details when the process stops.                                                                                                      |
 | `getProcessMetrics(id)`       | Bounded history and latest sample of process metrics.                                                                                                                |
 | `getHostMetrics()`            | Bounded history of host-wide network rates.                                                                                                                          |
 | `streamProcessLogs(id, type)` | `ReadableStream` of `stdout` or `stderr` lines. Replays stored lines, follows live output, and closes when the process stops.                                        |
 | `stopProcess(id)`             | Terminates a running process with SIGTERM, falling back to SIGKILL after 5 seconds. Logs remain available. Idempotent.                                               |
 | `stopTaskGroup(name)`         | Stops the running members of a group and returns their final process details.                                                                                        |
 | `deleteProcess(id)`           | Removes a stopped process and its logs. Rejected while the process is running.                                                                                       |
+| `deleteProcesses(opts)`       | Removes every stopped process matching `label` and/or `taskName`, returning the count. At least one filter is required; running matches are skipped.                 |
 
-A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, `cwd`, and `metrics` (the latest sample, or `null`). Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
+A process has `id`, `taskName`, `state` (`running` or `stopped`), `startedAt`, `stoppedAt`, `exitCode`, `cmd`, `args`, `cwd`, and `metrics` (the latest sample, or `null`). It may also carry a `label` and a `kind` (`run`, `pre-hook`, or `post-hook`). Once stopped, it has `durationMs`, the wall-clock time from just before spawn to after log collection. Environment variables are deliberately omitted from process details. A log entry has `type`, `line`, and `timestamp`; logs are buffered up to 5,000 lines per process.
 
 ### Metrics
 
@@ -347,15 +349,40 @@ The API runs local commands without authentication. Browser WebSocket connection
 velina-cli config                       provided and resolved config
 velina-cli config --format yaml         resolved config as YAML
 velina-cli groups                       list task groups and their tasks
-velina-cli start <task>                 start a task
-velina-cli start-group <group>          start every task in a group
-velina-cli ps                           list all processes
+velina-cli start <task> [--label L]     start a task
+velina-cli start-group <group> [--label L]
+                                        start every task in a group
+velina-cli ps [--label L] [--task T] [--kind K]
+                                        list matching processes
 velina-cli process <id>                 show process details
 velina-cli metrics <id>                 show process metrics history
 velina-cli logs <id> [stdout|stderr]    stream logs (default stdout)
 velina-cli stop <id>                    stop a process
 velina-cli stop-group <group>           stop running tasks in a group
 velina-cli delete <id>                  delete a stopped process
+velina-cli cleanup [--label L] [--task T]
+                                        delete stopped processes matching a filter
+velina-cli bench <task> [options]       run a task repeatedly and report timing
 ```
 
-Global options: `--port <port>` overrides the port from `.velina.yml`, `--json` makes `logs` emit one JSON object per line, and `--help` prints usage. Process ids may be abbreviated to any unique prefix. Errors are printed to stderr with exit code `1` for API failures and `2` for usage errors.
+`--label` tags started processes or filters `ps` and `cleanup`; `--task` and `--kind` filter `ps`, while `cleanup` accepts `--task`. `--kind` is one of `run`, `pre-hook`, or `post-hook`. Global options: `--port <port>` overrides the port from `.velina.yml`, `--json` makes `logs` emit one JSON object per line, and `--help` prints usage. Process ids may be abbreviated to any unique prefix. Errors are printed to stderr with exit code `1` for API failures and `2` for usage errors.
+
+### Benchmarking
+
+`bench` runs a task sequentially — Velina allows only one running process per task, which also keeps concurrent builds from racing over the same output directory. Each iteration is a separate process, so a run with `--repeat 5` produces five labelled `run` records.
+
+```
+velina-cli bench build --repeat 5 --label benchmark
+velina-cli bench build --repeat 5 --label cold --pre-hook clean --wait 0.5
+```
+
+Options:
+
+- `--repeat N` — number of runs, 1–100 (default: 1).
+- `--label L` — label for every process in the benchmark (default: `bench`). Hooks share the label and are distinguished by `kind`, so `ps --label L --kind run` shows only measured runs and `cleanup --label L` removes the whole set.
+- `--pre-hook T` / `--post-hook T` — tasks to run before and after each measured run, useful for clearing caches between iterations. Hook tasks must differ from the measured task.
+- `--wait S` — pause between iterations in seconds, including fractional values such as `0.5`. No unit suffixes are accepted.
+
+The command prints one JSON object: `runs` with each process `id`, `label`, `kind`, `durationMs`, and `exitCode`; and a `summary` with `minSeconds`, `maxSeconds`, `meanSeconds`, `medianSeconds`, and `p95Seconds`. Failed runs are recorded, but the loop stops there. A failed run or hook still prints the JSON, adds an `error` field, and exits with code `1`. On SIGINT, the active process is stopped and the collected results are printed.
+
+Benchmarking is designed for relatively long tasks (roughly > 100 ms), where process-spawn overhead is negligible. For measuring short pieces of code, use a dedicated test harness instead. Standard output is buffered in memory, so use `velina-cli logs <id>` to inspect a failed run; file-backed log persistence is not implemented yet.

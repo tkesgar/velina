@@ -2,11 +2,14 @@ import { RpcTarget } from "capnweb";
 import * as z from "zod";
 
 import type {
+  DeleteProcessesOptions,
   HostMetrics,
   LogEntry,
   LogType,
+  ProcessFilter,
   ProcessInfo,
   ProcessMetrics,
+  StartOptions,
   TaskGroupInfo,
   VelinaApi,
   YamlConfig,
@@ -15,9 +18,32 @@ import type { LoadedConfig } from "./config";
 import type { Velina } from "./velina";
 
 // Cap'n Web performs no runtime type checks. Validate the boundary values
-// that are used to look things up or select a stream.
+// that are used to look things up, select a stream, or filter a result set.
 const zName = z.string().min(1);
+const zLabel = z.string().min(1).max(200);
 const zLogType = z.enum(["stdout", "stderr"]);
+const zKind = z.enum(["run", "pre-hook", "post-hook"]);
+
+const zStartOptions = z
+  .object({ label: zLabel.optional(), kind: zKind.optional() })
+  .strict()
+  .optional();
+
+const zProcessFilter = z
+  .object({
+    label: zLabel.optional(),
+    taskName: zName.optional(),
+    kind: zKind.optional(),
+  })
+  .strict()
+  .optional();
+
+const zDeleteOptions = z
+  .object({ label: zLabel.optional(), taskName: zName.optional() })
+  .strict()
+  .refine((opts) => opts.label !== undefined || opts.taskName !== undefined, {
+    message: "deleteProcesses requires a label or taskName filter",
+  });
 
 export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
   readonly #velina: Velina;
@@ -39,20 +65,24 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
     return this.#velina.getAllTaskGroups();
   }
 
-  startTask(name: string): ProcessInfo {
-    return this.#velina.startTask(zName.parse(name));
+  startTask(name: string, opts?: StartOptions): ProcessInfo {
+    return this.#velina.startTask(zName.parse(name), zStartOptions.parse(opts));
   }
 
-  async startTaskGroup(name: string): Promise<ProcessInfo[]> {
-    return this.#velina.startTaskGroup(zName.parse(name));
+  async startTaskGroup(name: string, opts?: StartOptions): Promise<ProcessInfo[]> {
+    return this.#velina.startTaskGroup(zName.parse(name), zStartOptions.parse(opts));
   }
 
-  getAllProcesses(): ProcessInfo[] {
-    return this.#velina.getAllProcesses();
+  getAllProcesses(opts?: ProcessFilter): ProcessInfo[] {
+    return this.#velina.getAllProcesses(zProcessFilter.parse(opts));
   }
 
   getProcess(id: string): ProcessInfo {
     return this.#velina.getProcess(zName.parse(id));
+  }
+
+  async waitForProcess(id: string): Promise<ProcessInfo> {
+    return this.#velina.waitForProcess(zName.parse(id));
   }
 
   getProcessMetrics(id: string): ProcessMetrics {
@@ -77,5 +107,9 @@ export class VelinaRpcTarget extends RpcTarget implements VelinaApi {
 
   deleteProcess(id: string): void {
     this.#velina.deleteProcess(zName.parse(id));
+  }
+
+  deleteProcesses(opts: DeleteProcessesOptions): number {
+    return this.#velina.deleteProcesses(zDeleteOptions.parse(opts));
   }
 }
